@@ -17,7 +17,9 @@
       "Bash(/bmad-dev-story 0-2-后端项目初始化)",
       "Bash(npm init *)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(pkill -f \"npm run dev\")"
     ]
   }
 }
