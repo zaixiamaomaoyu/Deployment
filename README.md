@@ -1,0 +1,5 @@
+# Deployment
+前端部署学习平台——是一个面向前端开发者的交互式学习产品，旨在帮助零部署经验的开发者从「第 0 步」开始掌握前端包部署技能。产品采用 Web 前端 + AI 助手后端的架构，为用户提供引导式学习体验。
+
+# 项目github
+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
