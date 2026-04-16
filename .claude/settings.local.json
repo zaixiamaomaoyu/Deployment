@@ -4,7 +4,14 @@
       "WebSearch",
       "WebFetch(domain:vite.dev)",
       "WebFetch(domain:docs.anthropic.com)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(rm -rf node_modules)",
+      "Bash(rm -f package-lock.json)",
+      "Bash(cd:*)",
+      "Bash(timeout 10 npm run dev)",
+      "Bash(git add *)"
     ]
   }
 }
