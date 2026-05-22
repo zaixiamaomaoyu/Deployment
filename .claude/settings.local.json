@@ -19,7 +19,11 @@
       "Bash(npx tsc *)",
       "Bash(npm run *)",
       "Bash(curl -s http://localhost:3000/health)",
-      "Bash(pkill -f \"npm run dev\")"
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(mysql *)",
+      "Bash(npx ts-node *)",
+      "Bash(npm test *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

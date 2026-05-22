@@ -1,0 +1,48 @@
+# Dependency directories
+node_modules/
+npm-debug.log
+
+# Environment variables
+.env
+!.env.example
+
+# Frontend environment variables
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Build directories
+dist/
+build/
+*.tgz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Debug
+dump.rdb
+
+# Misc
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
