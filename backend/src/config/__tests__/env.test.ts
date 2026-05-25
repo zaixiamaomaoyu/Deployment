@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { env } from './env';
+import { env } from '../env';
 
 describe('Environment Variables', () => {
   test('should validate required environment variables', () => {
@@ -20,7 +20,7 @@ describe('Environment Variables', () => {
 
     expect(() => {
       // This should not throw if all required env vars are set
-      const testEnv = require('./env').env;
+      const testEnv = require('../env').env;
       expect(testEnv.DB_USER).toBe('test_user');
       expect(testEnv.DB_PASSWORD).toBe('test_password');
       expect(testEnv.WECHAT_APP_ID).toBe('test_app_id');
