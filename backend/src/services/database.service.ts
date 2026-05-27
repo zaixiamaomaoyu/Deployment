@@ -89,7 +89,7 @@ export class DatabaseService {
    */
   static async getTableRowCount(tableName: string): Promise<number> {
     try {
-      const [rows] = await pool.execute(
+      const [rows] = await pool.execute<RowDataPacket[]>(
         'SELECT COUNT(*) as count FROM ??',
         [tableName]
       );
@@ -119,7 +119,11 @@ export class DatabaseService {
       'admin_audit_logs'
     ];
 
-    const result = {
+    const result: {
+      success: boolean;
+      tables: string[];
+      errors: string[];
+    } = {
       success: true,
       tables: [],
       errors: []

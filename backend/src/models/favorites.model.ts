@@ -23,7 +23,7 @@ export class FavoritesModel {
       return true;
     } catch (error) {
       // 如果已存在，返回 false
-      if (error.message.includes('Duplicate entry')) {
+      if (error instanceof Error && error.message.includes('Duplicate entry')) {
         return false;
       }
       throw error;
