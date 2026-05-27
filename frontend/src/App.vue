@@ -1,5 +1,12 @@
 <script setup lang="ts">
-// Root application component
+import { onMounted } from 'vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+
+onMounted(() => {
+  userStore.fetchUserInfo()
+})
 </script>
 
 <template>

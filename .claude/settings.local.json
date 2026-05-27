@@ -23,7 +23,11 @@
       "Bash(mysql *)",
       "Bash(npx ts-node *)",
       "Bash(npm test *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(npx jest *)",
+      "Bash(git rm *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(git reset *)"
     ]
   }
 }
