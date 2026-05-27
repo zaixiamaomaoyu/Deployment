@@ -44,7 +44,7 @@ Story位置: _bmad-output/implementation-artifacts/stories
 开发状态:
   # Epic 0: 项目初始化
   epic-0: 进行中
-  0-1-前端项目初始化: 代码审查
+  0-1-前端项目初始化: 已完成
   0-2-后端项目初始化: 已完成
   0-3-数据库设计与初始化: review
   0-4-环境变量配置: in-progress
