@@ -8,6 +8,7 @@ import { env } from './config/env';
 import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import healthRoutes from './routes/health.routes';
+import authRoutes from './routes/auth.routes';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use(session({
 
 // 路由
 app.use('/api', healthRoutes);
+app.use('/api', authRoutes);
 
 // 404 处理
 app.use(notFoundHandler);

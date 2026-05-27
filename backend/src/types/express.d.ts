@@ -1,11 +1,17 @@
-import { Request } from 'express';
+import 'express-session';
+
+declare module 'express-session' {
+  interface SessionData {
+    userId?: number;
+  }
+}
 
 declare global {
   namespace Express {
     interface Request {
       user?: {
-        id: string;
-        username: string;
+        id: number;
+        openid: string;
         role: 'user' | 'admin';
       };
     }
