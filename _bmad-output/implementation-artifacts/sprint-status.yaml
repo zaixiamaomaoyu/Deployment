@@ -51,8 +51,8 @@ Story位置: _bmad-output/implementation-artifacts/stories
   epic-0-回顾: 可选
 
   # Epic 1: 用户认证
-  epic-1: 待开发
-  1-1-微信扫码登录前端: 待开发
+  epic-1: 进行中
+  1-1-微信扫码登录前端: 已完成
   1-2-微信OAuth后端集成: 待开发
   1-3-用户登录状态管理: 待开发
   1-4-用户角色区分: 待开发
