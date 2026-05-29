@@ -12,6 +12,15 @@ function parsePositiveInt(value: unknown, defaultValue: number, max?: number): n
   return max !== undefined && num > max ? max : num;
 }
 
+function parseLevel(value: unknown): number | undefined {
+  if (value == null || value === '') return undefined;
+  const num = Number(value);
+  if (Number.isNaN(num) || !Number.isInteger(num) || num < 1 || num > 5) {
+    return undefined;
+  }
+  return num;
+}
+
 export class ContentController {
   /**
    * 获取知识内容列表
@@ -19,7 +28,7 @@ export class ContentController {
    */
   static async list(req: Request, res: Response): Promise<void> {
     try {
-      const { domain, page = '1', limit = '20' } = req.query;
+      const { domain, level, page = '1', limit = '20' } = req.query;
 
       // 验证 domain 白名单
       const domainStr = domain as string | undefined;
@@ -31,11 +40,21 @@ export class ContentController {
         return;
       }
 
+      const parsedLevel = parseLevel(level);
+      if (level != null && level !== '' && parsedLevel === undefined) {
+        res.status(400).json({
+          code: 'VALIDATION_ERROR',
+          message: '无效的层级参数',
+        });
+        return;
+      }
+
       const parsedPage = parsePositiveInt(page, 1);
       const parsedLimit = parsePositiveInt(limit, 20, 100);
 
       const result = await ContentsModel.findAll({
         domain: domainStr,
+        level: parsedLevel,
         page: parsedPage,
         limit: parsedLimit,
       });

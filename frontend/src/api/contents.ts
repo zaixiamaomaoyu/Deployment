@@ -12,8 +12,8 @@ export interface Content {
   title: string
   description?: string
   content?: string
-  examples?: unknown
-  tags?: unknown
+  examples?: unknown[]
+  tags?: string[]
   created_at: string
   updated_at: string
 }
@@ -29,10 +29,19 @@ export interface ContentsResponse {
   message: string
 }
 
-export async function getContents(domain?: string, page = 1, limit = 20, signal?: AbortSignal): Promise<ContentsResponse> {
+export async function getContents(
+  domain?: string,
+  level?: number,
+  page = 1,
+  limit = 20,
+  signal?: AbortSignal
+): Promise<ContentsResponse> {
   const params: Record<string, string | number> = { page, limit }
   if (domain) {
     params.domain = domain
+  }
+  if (level !== undefined) {
+    params.level = level
   }
   const res = await api.get('/contents', { params, signal })
   return res.data
