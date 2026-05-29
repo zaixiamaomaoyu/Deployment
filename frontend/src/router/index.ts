@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/AuthCallback.vue'),
   },
   {
+    path: '/contents',
+    name: 'Contents',
+    component: () => import('@/views/ContentsView.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/favorites',
     name: 'Favorites',
     component: () => import('@/views/Home.vue'),

@@ -9,6 +9,7 @@ import { logger } from './utils/logger';
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
+import contentRoutes from './routes/content.routes';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use(session({
 // 路由
 app.use('/api', healthRoutes);
 app.use('/api', authRoutes);
+app.use('/api', contentRoutes);
 
 // 404 处理
 app.use(notFoundHandler);
