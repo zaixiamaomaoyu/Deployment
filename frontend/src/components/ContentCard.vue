@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Content } from '@/api/contents'
+import HighlightText from './HighlightText.vue'
 
 const props = defineProps<{
   content: Content
+  highlight?: string
 }>()
 
 const domainLabels: Record<string, string> = {
@@ -36,7 +38,7 @@ function getDomainColor(domain: string): string {
   <el-card class="content-card" shadow="hover">
     <template #header>
       <div class="card-header">
-        <span class="title">{{ props.content.title }}</span>
+        <span class="title"><HighlightText :text="props.content.title" :keyword="props.highlight" /></span>
         <div class="tags">
           <el-tag :type="getDomainColor(props.content.domain) as any" size="small">
             {{ getDomainLabel(props.content.domain) }}
@@ -45,7 +47,7 @@ function getDomainColor(domain: string): string {
         </div>
       </div>
     </template>
-    <p class="description">{{ props.content.description || '暂无简介' }}</p>
+    <p class="description"><HighlightText :text="props.content.description || '暂无简介'" :keyword="props.highlight" /></p>
   </el-card>
 </template>
 

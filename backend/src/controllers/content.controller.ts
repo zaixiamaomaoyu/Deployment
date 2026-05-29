@@ -21,6 +21,15 @@ function parseLevel(value: unknown): number | undefined {
   return num;
 }
 
+function parseSearch(value: unknown): string | undefined {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'object') return undefined;
+  const str = String(value).trim();
+  if (str.length === 0) return undefined;
+  if (str.length > 100) return str.slice(0, 100);
+  return str;
+}
+
 export class ContentController {
   /**
    * 获取知识内容列表
@@ -28,7 +37,7 @@ export class ContentController {
    */
   static async list(req: Request, res: Response): Promise<void> {
     try {
-      const { domain, level, page = '1', limit = '20' } = req.query;
+      const { domain, level, search, page = '1', limit = '20' } = req.query;
 
       // 验证 domain 白名单
       const domainStr = domain as string | undefined;
@@ -49,12 +58,15 @@ export class ContentController {
         return;
       }
 
+      const parsedSearch = parseSearch(search);
+
       const parsedPage = parsePositiveInt(page, 1);
       const parsedLimit = parsePositiveInt(limit, 20, 100);
 
       const result = await ContentsModel.findAll({
         domain: domainStr,
         level: parsedLevel,
+        search: parsedSearch,
         page: parsedPage,
         limit: parsedLimit,
       });

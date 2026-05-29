@@ -193,4 +193,115 @@ describe('ContentController.list', () => {
       message: '获取内容列表成功',
     });
   });
+
+  it('returns contents filtered by search', async () => {
+    req.query = { search: 'nginx' };
+    const mockResult = {
+      contents: [{ id: 1, title: 'Nginx Config', domain: 'server', level: 2 }],
+      total: 1,
+      page: 1,
+      totalPages: 1,
+    };
+    (ContentsModel.findAll as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.list(req as Request, res as Response);
+
+    expect(ContentsModel.findAll).toHaveBeenCalledWith({
+      domain: undefined,
+      level: undefined,
+      search: 'nginx',
+      page: 1,
+      limit: 20,
+    });
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'SUCCESS',
+      data: mockResult,
+      message: '获取内容列表成功',
+    });
+  });
+
+  it('returns contents filtered by domain, level, and search', async () => {
+    req.query = { domain: 'build', level: '2', search: 'vite' };
+    const mockResult = {
+      contents: [{ id: 1, title: 'Vite Build', domain: 'build', level: 2 }],
+      total: 1,
+      page: 1,
+      totalPages: 1,
+    };
+    (ContentsModel.findAll as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.list(req as Request, res as Response);
+
+    expect(ContentsModel.findAll).toHaveBeenCalledWith({
+      domain: 'build',
+      level: 2,
+      search: 'vite',
+      page: 1,
+      limit: 20,
+    });
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'SUCCESS',
+      data: mockResult,
+      message: '获取内容列表成功',
+    });
+  });
+
+  it('ignores empty string search', async () => {
+    req.query = { search: '' };
+    const mockResult = {
+      contents: [],
+      total: 0,
+      page: 1,
+      totalPages: 0,
+    };
+    (ContentsModel.findAll as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.list(req as Request, res as Response);
+
+    expect(ContentsModel.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: undefined,
+      })
+    );
+  });
+
+  it('ignores null search', async () => {
+    req.query = { search: null as unknown as string };
+    const mockResult = {
+      contents: [{ id: 1, title: 'Test', domain: 'build', level: 1 }],
+      total: 1,
+      page: 1,
+      totalPages: 1,
+    };
+    (ContentsModel.findAll as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.list(req as Request, res as Response);
+
+    expect(statusMock).not.toHaveBeenCalledWith(400);
+    expect(ContentsModel.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: undefined,
+      })
+    );
+  });
+
+  it('trims search and truncates longer than 100 chars', async () => {
+    const longSearch = 'a'.repeat(150);
+    req.query = { search: longSearch };
+    const mockResult = {
+      contents: [],
+      total: 0,
+      page: 1,
+      totalPages: 0,
+    };
+    (ContentsModel.findAll as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.list(req as Request, res as Response);
+
+    expect(ContentsModel.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: 'a'.repeat(100),
+      })
+    );
+  });
 });

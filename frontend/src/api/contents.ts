@@ -32,6 +32,7 @@ export interface ContentsResponse {
 export async function getContents(
   domain?: string,
   level?: number,
+  search?: string,
   page = 1,
   limit = 20,
   signal?: AbortSignal
@@ -42,6 +43,9 @@ export async function getContents(
   }
   if (level !== undefined) {
     params.level = level
+  }
+  if (search !== undefined && search !== '') {
+    params.search = search
   }
   const res = await api.get('/contents', { params, signal })
   return res.data

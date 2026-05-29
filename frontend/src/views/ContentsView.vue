@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import type { TabsPaneContext } from 'element-plus'
 import { getContents, type Content } from '@/api/contents'
 import ContentCard from '@/components/ContentCard.vue'
@@ -8,8 +8,20 @@ const loading = ref(false)
 const contents = ref<Content[]>([])
 const activeDomain = ref('')
 const activeLevel = ref<number | undefined>(undefined)
+const searchQuery = ref('')
 const error = ref('')
 let abortController: AbortController | null = null
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+const emptyDescription = computed(() => {
+  if (searchQuery.value && !activeDomain.value && activeLevel.value === undefined) {
+    return '未找到相关内容，请尝试其他关键词'
+  }
+  if (searchQuery.value) {
+    return '未找到匹配内容，请调整筛选条件或关键词'
+  }
+  return '该筛选条件下暂无内容，请尝试其他组合'
+})
 
 const domainLabels: Record<string, string> = {
   build: '构建',
@@ -44,6 +56,7 @@ async function loadData() {
     const res = await getContents(
       activeDomain.value || undefined,
       activeLevel.value,
+      searchQuery.value || undefined,
       1,
       20,
       abortController.signal
@@ -61,6 +74,20 @@ async function loadData() {
   }
 }
 
+function handleSearchInput() {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    loadData()
+  }, 300)
+}
+
+function handleSearchClear() {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = null
+  searchQuery.value = ''
+  loadData()
+}
+
 function handleTabClick(pane: TabsPaneContext) {
   const domain = (pane.paneName as string) || ''
   activeDomain.value = domain
@@ -74,6 +101,10 @@ function handleLevelChange() {
 onMounted(() => {
   loadData()
 })
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+})
 </script>
 
 <template>
@@ -81,6 +112,18 @@ onMounted(() => {
     <h1 class="page-title">知识内容</h1>
 
     <div class="filter-bar">
+      <el-input
+        v-model="searchQuery"
+        placeholder="搜索知识内容"
+        clearable
+        class="search-input"
+        @input="handleSearchInput"
+        @clear="handleSearchClear"
+      >
+        <template #prefix>
+          <el-icon><search /></el-icon>
+        </template>
+      </el-input>
       <el-select
         v-model="activeLevel"
         placeholder="选择层级"
@@ -102,7 +145,7 @@ onMounted(() => {
         <div v-loading="loading" class="content-list">
           <el-empty
             v-if="!loading && contents.length === 0"
-            description="该筛选条件下暂无内容，请尝试其他组合"
+            :description="emptyDescription"
           />
           <el-row v-else :gutter="16">
             <el-col
@@ -114,7 +157,7 @@ onMounted(() => {
               :lg="8"
               class="content-col"
             >
-              <ContentCard :content="content" />
+              <ContentCard :content="content" :highlight="searchQuery" />
             </el-col>
           </el-row>
         </div>
@@ -129,7 +172,7 @@ onMounted(() => {
         <div v-loading="loading" class="content-list">
           <el-empty
             v-if="!loading && contents.length === 0"
-            description="该筛选条件下暂无内容，请尝试其他组合"
+            :description="emptyDescription"
           />
           <el-row v-else :gutter="16">
             <el-col
@@ -141,7 +184,7 @@ onMounted(() => {
               :lg="8"
               class="content-col"
             >
-              <ContentCard :content="content" />
+              <ContentCard :content="content" :highlight="searchQuery" />
             </el-col>
           </el-row>
         </div>
@@ -166,6 +209,11 @@ onMounted(() => {
 }
 .filter-bar {
   margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+}
+.search-input {
+  width: 240px;
 }
 .level-select {
   width: 160px;
