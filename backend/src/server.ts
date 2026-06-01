@@ -6,7 +6,7 @@ const PORT = env.PORT;
 
 const server = app.listen(PORT, () => {
   logger.info(`🚀 后端服务器运行在端口 ${PORT}`);
-  logger.info(`🌐 健康检查: http://localhost:${PORT}/health`);
+  logger.info(`🌐 健康检查: http://localhost:${PORT}/api/health`);
 });
 
 // 处理端口绑定错误

@@ -14,7 +14,9 @@ export class DatabaseService {
     params?: any[]
   ): Promise<T> {
     try {
-      const [rows] = await pool.execute<T>(sql, params);
+      const [rows] = params && params.length > 0
+        ? await pool.query<T>(sql, params)
+        : await pool.query<T>(sql);
       return rows;
     } catch (error) {
       console.error('❌ 数据库查询失败:', { sql, params, error });
@@ -27,7 +29,9 @@ export class DatabaseService {
    */
   static async execute(sql: string, params?: any[]): Promise<ResultSetHeader> {
     try {
-      const [result] = await pool.execute<ResultSetHeader>(sql, params);
+      const [result] = params && params.length > 0
+        ? await pool.execute<ResultSetHeader>(sql, params)
+        : await pool.execute<ResultSetHeader>(sql);
       return result;
     } catch (error) {
       console.error('❌ 数据库执行失败:', { sql, params, error });

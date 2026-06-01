@@ -71,8 +71,8 @@ export class ContentsModel {
     if (contents[0]) {
       // 解析 JSON 字段
       const content = contents[0];
-      if (content.examples) content.examples = JSON.parse(content.examples);
-      if (content.tags) content.tags = JSON.parse(content.tags);
+      if (content.examples && typeof content.examples === 'string') content.examples = JSON.parse(content.examples);
+      if (content.tags && typeof content.tags === 'string') content.tags = JSON.parse(content.tags);
     }
 
     return contents[0] || null;
@@ -130,8 +130,8 @@ export class ContentsModel {
 
     // 解析 JSON 字段
     contents.forEach(content => {
-      if (content.examples) content.examples = JSON.parse(content.examples);
-      if (content.tags) content.tags = JSON.parse(content.tags);
+      if (content.examples && typeof content.examples === 'string') content.examples = JSON.parse(content.examples);
+      if (content.tags && typeof content.tags === 'string') content.tags = JSON.parse(content.tags);
     });
 
     const total = totalResult[0]?.total || 0;
@@ -330,8 +330,8 @@ export class ContentsModel {
 
     // 解析 JSON 字段
     contents.forEach(content => {
-      if (content.examples) content.examples = JSON.parse(content.examples);
-      if (content.tags) content.tags = JSON.parse(content.tags);
+      if (content.examples && typeof content.examples === 'string') content.examples = JSON.parse(content.examples);
+      if (content.tags && typeof content.tags === 'string') content.tags = JSON.parse(content.tags);
     });
 
     return contents;
