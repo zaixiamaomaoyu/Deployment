@@ -11,3 +11,8 @@
 - `loadData` 硬编码 `page=1`，后续引入分页状态时需调整 [frontend/src/views/ContentsView.vue:56-62] — 分页尚未实现
 - 缺少特殊正则字符的端到端测试 [backend/src/controllers/__tests__/content.controller.test.ts] — 测试覆盖度问题
 - 缺少 XSS payload 的显式安全测试 [backend/src/controllers/__tests__/content.controller.test.ts] — 测试覆盖度问题
+
+## Deferred from: code review of 2-4-内容详情页 (2026-06-01)
+
+- findNeighbors 查询未考虑内容可见性/权限 [backend/src/models/contents.model.ts] — 未过滤未发布/已删除内容，pre-existing 设计问题
+- domainColors / domainLabels 映射多处重复定义 [frontend/src/views/ContentDetailView.vue] — ContentCard.vue 和 ContentDetailView.vue 中重复，pre-existing 代码重复
