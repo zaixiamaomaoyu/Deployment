@@ -55,3 +55,12 @@ export async function getContentById(id: number): Promise<{ code: string; data: 
   const res = await api.get(`/contents/${id}`)
   return res.data
 }
+
+export async function getContentNeighbors(id: number): Promise<{
+  code: string
+  data: { prev: Content | null; next: Content | null }
+  message: string
+}> {
+  const res = await api.get(`/contents/${id}/neighbors`)
+  return res.data
+}

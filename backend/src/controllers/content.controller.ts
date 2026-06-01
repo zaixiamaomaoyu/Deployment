@@ -124,4 +124,45 @@ export class ContentController {
       });
     }
   }
+
+  /**
+   * 获取相邻内容（上一篇/下一篇）
+   * GET /api/contents/:id/neighbors
+   */
+  static async getNeighbors(req: Request, res: Response): Promise<void> {
+    try {
+      const id = Number(req.params.id);
+
+      if (Number.isNaN(id) || !Number.isInteger(id) || id < 1) {
+        res.status(400).json({
+          code: 'VALIDATION_ERROR',
+          message: '无效的内容 ID',
+        });
+        return;
+      }
+
+      const content = await ContentsModel.findById(id);
+      if (!content) {
+        res.status(404).json({
+          code: 'NOT_FOUND',
+          message: '内容不存在',
+        });
+        return;
+      }
+
+      const neighbors = await ContentsModel.findNeighbors(id);
+
+      res.json({
+        code: 'SUCCESS',
+        data: neighbors,
+        message: '获取相邻内容成功',
+      });
+    } catch (error) {
+      logger.error('获取相邻内容失败:', error);
+      res.status(500).json({
+        code: 'INTERNAL_ERROR',
+        message: '获取相邻内容失败',
+      });
+    }
+  }
 }

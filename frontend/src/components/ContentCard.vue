@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import type { Content } from '@/api/contents'
 import HighlightText from './HighlightText.vue'
 
@@ -6,6 +7,12 @@ const props = defineProps<{
   content: Content
   highlight?: string
 }>()
+
+const router = useRouter()
+
+function handleClick() {
+  router.push(`/contents/${props.content.id}`)
+}
 
 const domainLabels: Record<string, string> = {
   build: '构建',
@@ -35,7 +42,7 @@ function getDomainColor(domain: string): string {
 </script>
 
 <template>
-  <el-card class="content-card" shadow="hover">
+  <el-card class="content-card" shadow="hover" @click="handleClick">
     <template #header>
       <div class="card-header">
         <span class="title"><HighlightText :text="props.content.title" :keyword="props.highlight" /></span>
@@ -54,6 +61,7 @@ function getDomainColor(domain: string): string {
 <style scoped>
 .content-card {
   transition: transform 0.2s;
+  cursor: pointer;
 }
 .content-card:hover {
   transform: translateY(-4px);

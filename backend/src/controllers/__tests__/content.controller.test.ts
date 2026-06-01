@@ -305,3 +305,134 @@ describe('ContentController.list', () => {
     );
   });
 });
+
+describe('ContentController.getNeighbors', () => {
+  let req: Partial<Request>;
+  let res: Partial<Response>;
+  let jsonMock: jest.Mock;
+  let statusMock: jest.Mock;
+
+  beforeEach(() => {
+    jsonMock = jest.fn();
+    statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+    req = { params: {} };
+    res = {
+      json: jsonMock,
+      status: statusMock,
+    };
+    jest.clearAllMocks();
+  });
+
+  it('returns prev and next content', async () => {
+    req.params = { id: '2' };
+    const mockResult = {
+      prev: { id: 1, title: 'Prev Content', domain: 'build', level: 1 },
+      next: { id: 3, title: 'Next Content', domain: 'server', level: 2 },
+    };
+    (ContentsModel.findNeighbors as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(ContentsModel.findNeighbors).toHaveBeenCalledWith(2);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'SUCCESS',
+      data: mockResult,
+      message: '获取相邻内容成功',
+    });
+  });
+
+  it('returns 400 for invalid id=0', async () => {
+    req.params = { id: '0' };
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'VALIDATION_ERROR',
+      message: '无效的内容 ID',
+    });
+  });
+
+  it('returns 400 for invalid id=-1', async () => {
+    req.params = { id: '-1' };
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'VALIDATION_ERROR',
+      message: '无效的内容 ID',
+    });
+  });
+
+  it('returns 400 for invalid id=abc', async () => {
+    req.params = { id: 'abc' };
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'VALIDATION_ERROR',
+      message: '无效的内容 ID',
+    });
+  });
+
+  it('returns 400 for invalid id=3.14', async () => {
+    req.params = { id: '3.14' };
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(400);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'VALIDATION_ERROR',
+      message: '无效的内容 ID',
+    });
+  });
+
+  it('returns null for prev when first content', async () => {
+    req.params = { id: '1' };
+    const mockResult = {
+      prev: null,
+      next: { id: 2, title: 'Next Content', domain: 'build', level: 1 },
+    };
+    (ContentsModel.findNeighbors as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'SUCCESS',
+      data: mockResult,
+      message: '获取相邻内容成功',
+    });
+  });
+
+  it('returns null for next when last content', async () => {
+    req.params = { id: '10' };
+    const mockResult = {
+      prev: { id: 9, title: 'Prev Content', domain: 'server', level: 2 },
+      next: null,
+    };
+    (ContentsModel.findNeighbors as jest.Mock).mockResolvedValue(mockResult);
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'SUCCESS',
+      data: mockResult,
+      message: '获取相邻内容成功',
+    });
+  });
+
+  it('returns 500 when model throws', async () => {
+    req.params = { id: '1' };
+    (ContentsModel.findNeighbors as jest.Mock).mockRejectedValue(new Error('DB error'));
+
+    await ContentController.getNeighbors(req as Request, res as Response);
+
+    expect(statusMock).toHaveBeenCalledWith(500);
+    expect(jsonMock).toHaveBeenCalledWith({
+      code: 'INTERNAL_ERROR',
+      message: '获取相邻内容失败',
+    });
+  });
+});
