@@ -4,17 +4,24 @@ import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
+import { Star } from '@element-plus/icons-vue'
+import axios, { AxiosError } from 'axios'
 import { getContentById, getContentNeighbors, type Content } from '@/api/contents'
+import { getFavoriteStatus, toggleFavorite } from '@/api/favorites'
+import { useUserStore } from '@/stores/user'
 import CodeBlock from '@/components/CodeBlock.vue'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const content = ref<Content | null>(null)
 const neighbors = ref<{ prev: Content | null; next: Content | null }>({ prev: null, next: null })
 const loading = ref(false)
 const notFound = ref(false)
 const isMounted = ref(true)
+const isFavorited = ref(false)
+const favoriteLoading = ref(false)
 
 onBeforeUnmount(() => {
   isMounted.value = false
@@ -64,6 +71,36 @@ function goTo(id: number) {
   router.push(`/contents/${id}`)
 }
 
+async function handleToggleFavorite() {
+  if (!userStore.isLoggedIn || !content.value) return
+  if (favoriteLoading.value) return
+
+  const rawId = route.params.id
+  favoriteLoading.value = true
+  try {
+    const res = await toggleFavorite(content.value.id)
+    if (!isMounted.value || route.params.id !== rawId) return
+    if (res.code === 'SUCCESS' && res.data) {
+      isFavorited.value = Boolean(res.data.isFavorited)
+      ElMessage.success(res.data.action === 'added' ? '已收藏' : '已取消收藏')
+    } else {
+      ElMessage.error('操作失败，请稍后重试')
+    }
+  } catch (err) {
+    if (!isMounted.value || route.params.id !== rawId) return
+    if (axios.isAxiosError(err) && err.response?.status === 401) {
+      ElMessage.warning('登录已过期，请重新登录')
+      await userStore.logout()
+      router.push({ path: '/login', query: { redirect: route.fullPath } })
+      return
+    }
+    ElMessage.error('操作失败，请稍后重试')
+  } finally {
+    // 无条件重置 favoriteLoading：若组件已卸载或路由已切换，按钮本就不可见，重置无副作用
+    favoriteLoading.value = false
+  }
+}
+
 async function loadData() {
   const rawId = route.params.id
   const id = Number(rawId)
@@ -75,12 +112,21 @@ async function loadData() {
 
   loading.value = true
   notFound.value = false
+  isFavorited.value = false
+  // 跨页面切换时强制重置 loading，避免上一页面的 toggle 请求残留
+  favoriteLoading.value = false
 
   try {
-    const [contentResult, neighborsResult] = await Promise.allSettled([
+    // 主内容、neighbors、收藏状态（已登录）并发请求
+    const requests: Promise<unknown>[] = [
       getContentById(id),
       getContentNeighbors(id),
-    ])
+    ]
+    if (userStore.isLoggedIn) {
+      requests.push(getFavoriteStatus(id))
+    }
+
+    const [contentResult, neighborsResult, favoriteResult] = await Promise.allSettled(requests)
 
     if (!isMounted.value || route.params.id !== rawId) return
 
@@ -101,6 +147,24 @@ async function loadData() {
       const neighborsRes = neighborsResult.value
       if (neighborsRes.code === 'SUCCESS' && neighborsRes.data) {
         neighbors.value = neighborsRes.data
+      }
+    }
+
+    // 收藏状态：仅在校验 content 加载成功后才应用（避免 404 时仍覆盖状态）
+    if (userStore.isLoggedIn && favoriteResult) {
+      if (favoriteResult.status === 'fulfilled') {
+        const favRes = favoriteResult.value
+        if (favRes.code === 'SUCCESS' && favRes.data) {
+          isFavorited.value = Boolean(favRes.data.isFavorited)
+        }
+      } else {
+        // 收藏状态查询失败（含 401 Session 过期）：清除登录态，UI 自动隐藏按钮
+        const reason = favoriteResult.reason
+        if (axios.isAxiosError(reason) && reason.response?.status === 401) {
+          await userStore.logout()
+        } else {
+          console.warn('加载收藏状态失败:', reason)
+        }
       }
     }
   } catch {
@@ -132,7 +196,20 @@ watch(() => route.params.id, () => {
 
     <template v-else-if="content">
       <div class="detail-header">
-        <h1 class="title">{{ content.title }}</h1>
+        <div class="title-row">
+          <h1 class="title">{{ content.title }}</h1>
+          <el-button
+            v-if="userStore.isLoggedIn"
+            :type="isFavorited ? 'warning' : 'default'"
+            :icon="Star"
+            :loading="favoriteLoading"
+            size="small"
+            class="favorite-btn"
+            @click="handleToggleFavorite"
+          >
+            {{ isFavorited ? '已收藏' : '收藏' }}
+          </el-button>
+        </div>
         <div class="meta">
           <el-tag :type="domainColors[content.domain]" size="small">
             {{ domainLabels[content.domain] || content.domain }}
@@ -211,12 +288,25 @@ watch(() => route.params.id, () => {
   border-bottom: 1px solid #e4e7ed;
 }
 
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
 .title {
   font-size: 28px;
   font-weight: 600;
   color: #303133;
-  margin: 0 0 12px 0;
+  margin: 0;
   line-height: 1.4;
+  flex: 1;
+}
+
+.favorite-btn {
+  flex-shrink: 0;
 }
 
 .meta {
@@ -377,6 +467,12 @@ watch(() => route.params.id, () => {
 @media (max-width: 768px) {
   .content-detail {
     padding: 16px 12px;
+  }
+
+  .title-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .title {

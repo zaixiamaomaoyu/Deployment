@@ -1,3 +1,16 @@
+## Deferred from: code review of 2-5-内容收藏功能 (2026-06-02)
+
+- 并发 toggle 唯一索引冲突 / `FavoritesModel.toggle` 非事务 [backend/src/models/favorites.model.ts:80-99] — FavoritesModel 在 story 开始前已就位，spec 明确禁止重新实现；并发 toggle 在 MySQL 唯一索引下偶发 500，需改用事务或 `INSERT ... ON DUPLICATE KEY UPDATE`
+- 路由层缺鉴权中间件 [backend/src/routes/favorites.routes.ts] — 项目既有模式为 controller 内 `req.session?.userId` 检查（与 auth.controller 一致），抽出 `requireAuth` 中间件属全站重构
+- CSRF 防护缺失 [backend/src/routes/favorites.routes.ts:7] — 全站写操作均依赖 cookie session，需统一引入 csurf 或 `SameSite=Strict`；非本 story 引入风险
+- toggle 接口无速率限制 [backend/src/controllers/favorites.controller.ts:14-40] — 全站未对写接口做 per-user rate limit
+- `FavoritesModel.add` 用 `error.message.includes('Duplicate entry')` 判重 [backend/src/models/favorites.model.ts:24-30] — 多语言 MySQL 不可靠；应改用 `error.code === 'ER_DUP_ENTRY'`（FavoritesModel 既有实现）
+- `FavoritesModel.findByUser` 分页参数未校验 [backend/src/models/favorites.model.ts:54-75] — 属 Story 2-6 收藏列表页范围
+- axios 实例分散在每个 API 文件 [frontend/src/api/favorites.ts:3-6] — contents.ts / auth.ts 同样模式；统一抽取 `src/api/http.ts` 属全局重构
+- `isMounted` ref 模式 vs `AbortController` [frontend/src/views/ContentDetailView.vue:18] — Story 2-4 引入的既有模式，重构超出本 story 范围
+- axios baseURL 生产构建回退到 `localhost:3000` [frontend/src/api/favorites.ts:4] — contents.ts 同样问题；属全站部署配置问题
+- 路由顺序敏感（未来 `/favorites` 与 `/favorites/:contentId` 冲突） [backend/src/routes/favorites.routes.ts] — 当前只有两条路由无冲突，Story 2-6 扩展时再考虑
+
 ## Deferred from: code review of 2-1-知识内容列表页 (2026-05-29)
 
 - ContentsModel JSON parse 无 try/catch [backend/src/models/contents.model.ts] — 非本次变更引入，数据库已有数据时若 JSON 字段损坏会导致查询 500 错误
