@@ -1,13 +1,12 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import {
+  getCurrentUser,
+  logout as apiLogout,
+  type UserInfo,
+} from '@/api/auth'
 
-export interface UserInfo {
-  id: number
-  openid?: string
-  nickname: string | null
-  avatar_url: string | null
-  role: 'user' | 'admin'
-}
+export type { UserInfo }
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref<UserInfo | null>(null)
@@ -16,13 +15,8 @@ export const useUserStore = defineStore('user', () => {
 
   async function fetchUserInfo(): Promise<boolean> {
     try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' })
-      if (res.ok) {
-        userInfo.value = await res.json()
-        return true
-      }
-      userInfo.value = null
-      return false
+      userInfo.value = await getCurrentUser()
+      return true
     } catch {
       userInfo.value = null
       return false
@@ -34,8 +28,11 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-    userInfo.value = null
+    try {
+      await apiLogout()
+    } finally {
+      userInfo.value = null
+    }
   }
 
   return {

@@ -3,6 +3,7 @@ import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { View, Hide } from '@element-plus/icons-vue'
 import { register, getCaptcha } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 

@@ -1,10 +1,10 @@
 ---
-stepsCompleted: [1, 2, 3]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7]
 inputDocuments: ['_bmad-output/planning-artifacts/prd.md']
 workflowType: 'architecture'
 project_name: 'Deployment'
 user_name: 'maomaoyu'
-date: '2026-03-25'
+date: '2026-06-02'
 ---
 
 # Architecture Decision Document
@@ -231,3 +231,370 @@ SESSION_SECRET=your-session-secret
 2. 后端项目初始化 + TypeScript 配置
 3. 数据库创建 + 基础表结构
 4. 环境变量配置
+
+## 🎨 系统样式优化架构设计
+
+### 核心设计原则
+
+1. **空间最大化利用**
+   - 采用全屏设计，减少不必要的空白
+   - 使用CSS Grid实现精确的布局控制
+   - 优化响应式断点，确保各尺寸设备充分利用空间
+
+2. **视觉层次优化**
+   - 重新设计Hero区域：移除多余padding，增加视觉冲击力
+   - 优化导航栏：固定高度但更紧凑的布局
+   - 改进卡片系统：减少间距，增加信息密度
+
+3. **响应式布局架构**
+   ```css
+   /* 全屏布局核心 */
+   .full-screen-layout {
+     display: grid;
+     grid-template-rows: auto 1fr auto;
+     min-height: 100vh;
+     gap: 0;
+   }
+   
+   /* 内容区域网格优化 */
+   .content-grid {
+     display: grid;
+     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+     gap: 16px;
+     padding: 24px;
+   }
+   
+   /* 响应式断点重构 */
+   :root {
+     --breakpoint-sm: 640px;
+     --breakpoint-md: 768px;
+     --breakpoint-lg: 1024px;
+     --breakpoint-xl: 1280px;
+   }
+   ```
+
+### 组件架构改进
+
+#### 1. Hero区域优化
+- 移除多余的垂直padding
+- 采用渐变背景增强视觉层次
+- 优化文字大小和间距
+- 增加动态装饰元素
+
+#### 2. 导航栏重构
+- 固定在顶部，减少占用空间
+- 优化品牌logo区域
+- 移动端采用汉堡菜单
+- 简化用户菜单结构
+
+#### 3. 卡片系统升级
+- 减少卡片内边距
+- 优化标题和描述的层次
+- 添加更精致的hover效果
+- 改进标签布局
+
+#### 4. 域选择区域
+- 使用CSS Grid替代flex布局
+- 优化卡片间距和大小
+- 改进点击反馈效果
+- 增加视觉吸引力
+
+### 实现策略
+
+#### Phase 1: 基础布局优化
+1. 修改根样式变量，减少默认间距
+2. 实现全屏容器
+3. 优化Hero区域布局
+4. 改进导航栏结构
+
+#### Phase 2: 组件视觉升级
+1. 重构ContentCard组件
+2. 优化领域选择卡片
+3. 改进按钮和输入框样式
+4. 添加过渡动画
+
+#### Phase 3: 响应式完善
+1. 优化移动端布局
+2. 改进触摸交互
+3. 测试各设备表现
+4. 性能优化
+
+### 技术实现要点
+
+1. **CSS自定义属性**
+   ```css
+   :root {
+     --spacing-xs: 4px;
+     --spacing-sm: 8px;
+     --spacing-md: 16px;
+     --spacing-lg: 24px;
+     --spacing-xl: 32px;
+     
+     --border-radius-sm: 6px;
+     --border-radius-md: 8px;
+     --border-radius-lg: 12px;
+     
+     --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+     --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+     --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+   }
+   ```
+
+2. **Element Plus主题定制**
+   - 覆盖默认间距变量
+   - 自定义颜色和阴影
+   - 优化组件默认样式
+
+3. **性能优化**
+   - 使用CSS containment
+   - 优化重绘区域
+   - 减少DOM节点数
+
+## 🏗️ 项目结构与边界定义
+
+### 完整项目目录结构
+
+```
+frontend/
+├── public/
+│   └── favicon.ico
+├── src/
+│   ├── assets/
+│   │   ├── styles/
+│   │   │   ├── variables.css      # 全局CSS变量
+│   │   │   ├── global.css         # 全局样式
+│   │   │   ├── components/        # 组件公共样式
+│   │   │   │   ├── cards.css      # 卡片组件样式
+│   │   │   │   ├── forms.css      # 表单组件样式
+│   │   │   │   └── nav.css        # 导航组件样式
+│   │   │   └── themes/           # 主题样式
+│   │   │       └── element-plus.css # Element Plus主题覆盖
+│   │   └── images/
+│   │       └── logo.svg
+│   ├── components/
+│   │   ├── NavBar.vue            # 导航栏组件
+│   │   ├── ContentCard.vue       # 内容卡片组件
+│   │   └── HighlightText.vue     # 文本高亮组件
+│   ├── views/
+│   │   ├── Home.vue             # 首页（样式优化重点）
+│   │   ├── Contents.vue         # 内容列表页
+│   │   └── Login.vue            # 登录页
+│   ├── stores/
+│   │   ├── user.ts              # 用户状态管理
+│   │   └── index.ts
+│   ├── router/
+│   │   ├── index.ts             # 路由配置
+│   │   └── types.ts
+│   ├── api/
+│   │   ├── contents.ts          # 内容API
+│   │   └── index.ts
+│   ├── types/
+│   │   └── index.ts             # TypeScript类型定义
+│   ├── utils/
+│   │   ├── index.ts             # 工具函数
+│   │   └── helpers/
+│   ├── App.vue                  # 应用根组件
+│   ├── main.ts                  # 应用入口
+│   └── style.css                # 全局样式文件
+├── package.json
+├── vite.config.ts               # Vite配置（样式优化相关）
+├── tsconfig.json
+├── .env
+└── .env.example
+```
+
+### CSS变量系统
+
+```css
+/* src/assets/styles/variables.css */
+:root {
+  /* 颜色系统 */
+  --primary-color: #409eff;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  
+  /* 间距系统 */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  
+  /* 圆角系统 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  /* 阴影系统 */
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  
+  /* 字体系统 */
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 24px;
+  --font-size-xxl: 32px;
+  
+  /* 网格系统 */
+  --grid-gap: 16px;
+  --grid-padding: 24px;
+}
+```
+
+### 架构边界
+
+#### 组件边界
+1. **样式组件边界**
+   - `Home.vue` - 负责整体布局和Hero区域
+   - `ContentCard.vue` - 负责内容展示样式
+   - `NavBar.vue` - 负责导航和用户菜单
+
+2. **样式资源边界**
+   - 全局样式在 `assets/styles/global.css`
+   - 组件样式在对应组件文件内
+   - 公共样式在 `assets/styles/components/`
+
+#### 实施模式与一致性规则
+
+**CSS命名规范**：采用BEM（Block Element Modifier）
+- 组件类名：`.component-name`
+- 元素类名：`.component-name__element`
+- 修饰类名：`.component-name--modifier`
+
+**强制执行规则**：
+1. 使用CSS变量进行主题定制
+2. 遵循BEM命名规范
+3. 组件样式使用scoped
+4. 响应式设计采用移动优先
+5. 不直接修改Element Plus组件样式
+
+## ✅ 架构验证结果
+
+### 一致性验证 ✅
+
+**决策兼容性：**
+- Vue 3 + TypeScript + Vite + Element Plus 完美配合
+- CSS变量系统与Element Plus主题定制兼容
+- BEM命名规范与scoped样式无冲突
+
+**模式一致性：**
+- 命名规范在所有组件中保持一致
+- 响应式断点统一使用CSS变量
+- 主题定制统一通过CSS变量实现
+
+**结构对齐：**
+- 项目结构完全支持架构决策
+- 样式资源组织清晰
+- 组件边界明确
+
+### 需求覆盖验证 ✅
+
+**功能需求覆盖：**
+- ✅ 首页样式优化（Hero区域、领域卡片、内容展示）
+- ✅ 知识内容浏览（卡片系统、搜索、筛选）
+- ✅ 响应式布局（移动端、平板、桌面）
+- ✅ 视觉层次（标题、描述、标签、按钮）
+
+**非功能需求覆盖：**
+- ✅ 性能：CSS containment、优化重绘
+- ✅ 可维护性：CSS变量系统、BEM命名
+- ✅ 可扩展性：主题系统、组件化设计
+
+### 实施就绪验证 ✅
+
+**决策完整性：**
+- 所有技术选型已确定
+- CSS变量系统已定义
+- 组件架构已规划
+
+**结构完整性：**
+- 完整目录结构已定义
+- 文件组织清晰
+- 集成点明确
+
+**模式完整性：**
+- 命名规范、结构规范、通信规范已定义
+- 错误处理和加载状态模式已规划
+
+### 架构完整性检查清单
+
+**✅ 需求分析**
+- [x] 项目上下文已分析
+- [x] 复杂度已评估
+- [x] 技术约束已识别
+- [x] 跨领域关注点已映射
+
+**✅ 架构决策**
+- [x] 关键决策已文档化
+- [x] 技术栈已完整定义
+- [x] 集成模式已定义
+- [x] 性能考虑已处理
+
+**✅ 实施模式**
+- [x] 命名规范已建立
+- [x] 结构模式已定义
+- [x] 通信模式已指定
+- [x] 处理模式已文档化
+
+**✅ 项目结构**
+- [x] 完整目录结构已定义
+- [x] 组件边界已建立
+- [x] 集成点已映射
+- [x] 需求到结构的映射已完成
+
+### 架构就绪评估
+
+**整体状态：** ✅ **准备实施**
+
+**信心水平：** 高
+
+**关键优势：**
+1. 现有Vue 3 + Element Plus技术栈成熟稳定
+2. 样式系统结构化、可维护
+3. 响应式设计策略明确
+4. 性能优化考虑周全
+5. 实施路径清晰
+
+**未来可增强领域：**
+1. 添加更多动画示例
+2. 扩展组件变体库
+3. 主题切换功能（明/暗模式）
+4. 高级视觉效果（玻璃态、阴影变化）
+
+### 实施交接
+
+**AI Agent实施指南：**
+1. 严格遵循架构文档中的所有决策
+2. 使用BEM命名规范和CSS变量
+3. 保持组件样式隔离（scoped）
+4. 实施移动优先的响应式设计
+5. 通过CSS变量定制Element Plus主题
+
+**优先实施顺序：**
+1. 创建样式资源目录结构（`src/assets/styles/`）
+2. 定义CSS变量系统（`variables.css`）
+3. 重构Home.vue布局（Hero区域优化）
+4. 优化ContentCard组件（卡片系统升级）
+5. 改进NavBar组件（导航栏紧凑化）
+6. 完善响应式断点和移动端适配
+7. 性能优化和测试
+
+---
+
+## 📝 架构设计完成
+
+本架构文档已完成所有7个步骤的协作设计，涵盖了：
+- 项目上下文分析
+- 启动模板评估
+- 核心架构决策
+- 实施模式与一致性规则
+- 项目结构与边界定义
+- 架构验证
+
+**文档版本：** v1.0
+**完成日期：** 2026-06-02
+**架构师：** maomaoyu + AI 架构协作伙伴
+
