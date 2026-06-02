@@ -13,14 +13,26 @@ import contentRoutes from './routes/content.routes';
 
 const app = express();
 
+// 信任反向代理（生产环境必需，让 req.ip / req.protocol 正确识别客户端）
+app.set('trust proxy', 1);
+
 // 安全中间件
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
+}));
 
 // 速率限制
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   max: 100, // 限制每个IP 100个请求
-  message: { error: '请求过于频繁，请稍后再试' }
+  message: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' }
 });
 app.use(limiter);
 
@@ -32,8 +44,8 @@ app.use(cors({
   origin: env.CORS_ORIGIN,
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Session 配置
 app.use(session({

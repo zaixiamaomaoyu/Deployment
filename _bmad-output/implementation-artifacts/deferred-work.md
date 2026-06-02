@@ -16,3 +16,10 @@
 
 - findNeighbors 查询未考虑内容可见性/权限 [backend/src/models/contents.model.ts] — 未过滤未发布/已删除内容，pre-existing 设计问题
 - domainColors / domainLabels 映射多处重复定义 [frontend/src/views/ContentDetailView.vue] — ContentCard.vue 和 ContentDetailView.vue 中重复，pre-existing 代码重复
+
+## Deferred from: code review of spec-auth-password-captcha-login (2026-06-02)
+
+- **D4 + H6 — 生产 MemoryStore 改造为 Redis Store** [backend/src/app.ts:39] — 用户决策：推迟到 Epic 7 后台管理统一处理；MVP 阶段保持单实例并在文档中标注限制
+- **M1（部分）— 注册接口主动暴露 USERNAME_EXISTS** [backend/src/controllers/auth.controller.ts:102-105] — 用户决策：保持 409 响应优先 UX，接受用户名可枚举风险；M1 时序攻击部分仍需修复
+- **D1 — bcryptjs vs bcrypt** [backend/src/controllers/auth.controller.ts:2] — 用户决策：保留 bcryptjs，需同步更新 spec Design Notes
+- **D3 — CSRF 防护** [backend/src/app.ts:39-49] — 用户决策：保持 sameSite=lax 现状，spec 未要求

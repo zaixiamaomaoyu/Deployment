@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -36,7 +36,7 @@ const rules: FormRules = {
 
 async function refreshCaptcha() {
   try {
-    captchaUrl.value = await getCaptcha()
+    captchaUrl.value = await getCaptcha(captchaUrl.value)
   } catch {
     ElMessage.error('验证码加载失败')
   }
@@ -55,8 +55,8 @@ async function handleSubmit() {
       captcha: form.captcha,
       remember: form.remember,
     })
+    // M8 — 登录接口已返回完整 user，直接信任 setUser，无需再调用 fetchUserInfo
     userStore.setUser(user)
-    await userStore.fetchUserInfo()
     ElMessage.success('登录成功')
     router.push('/')
   } catch (err: any) {
@@ -71,6 +71,14 @@ async function handleSubmit() {
 
 onMounted(() => {
   refreshCaptcha()
+})
+
+// L1 — 组件卸载时清理 blob URL
+onBeforeUnmount(() => {
+  if (captchaUrl.value) {
+    URL.revokeObjectURL(captchaUrl.value)
+    captchaUrl.value = ''
+  }
 })
 </script>
 

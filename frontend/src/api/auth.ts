@@ -7,6 +7,7 @@ const api = axios.create({
 
 export interface UserInfo {
   id: number
+  username: string
   openid?: string
   nickname: string | null
   avatar_url: string | null
@@ -46,9 +47,16 @@ export async function register(data: RegisterData): Promise<UserInfo> {
   return res.data
 }
 
-export async function getCaptcha(): Promise<string> {
+/**
+ * 获取验证码图片，返回 blob URL。
+ * 调用方负责在刷新前 revokeObjectURL 旧 URL，避免内存泄露。
+ */
+export async function getCaptcha(previousUrl?: string): Promise<string> {
   const res = await api.get('/auth/captcha', {
     responseType: 'blob',
   })
+  if (previousUrl) {
+    URL.revokeObjectURL(previousUrl)
+  }
   return URL.createObjectURL(res.data)
 }

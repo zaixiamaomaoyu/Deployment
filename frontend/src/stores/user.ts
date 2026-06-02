@@ -17,9 +17,15 @@ export const useUserStore = defineStore('user', () => {
     try {
       userInfo.value = await getCurrentUser()
       return true
-    } catch {
-      userInfo.value = null
-      return false
+    } catch (err: any) {
+      // M9 — 仅 401（未登录/会话失效）才清空状态，网络错误/500 保留状态避免误踢
+      const status = err?.response?.status
+      if (status === 401 || status === 403) {
+        userInfo.value = null
+        return false
+      }
+      // 网络错误/服务器错误时保留现有 userInfo，避免登录用户被误踢
+      return userInfo.value !== null
     }
   }
 

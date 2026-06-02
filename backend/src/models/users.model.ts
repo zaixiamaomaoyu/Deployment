@@ -54,7 +54,7 @@ export class UsersModel {
    * 根据用户名查找用户
    */
   static async findByUsername(username: string): Promise<User | null> {
-    const sql = 'SELECT * FROM users WHERE username = ?';
+    const sql = 'SELECT id, username, password_hash, role, nickname, avatar_url, created_at, updated_at FROM users WHERE username = ?';
     const users = await DatabaseService.query<User[]>(sql, [username]);
     return users[0] || null;
   }
@@ -93,7 +93,7 @@ export class UsersModel {
    * 根据 ID 查找用户
    */
   static async findById(id: number): Promise<User | null> {
-    const sql = 'SELECT * FROM users WHERE id = ?';
+    const sql = 'SELECT id, username, password_hash, role, nickname, avatar_url, created_at, updated_at FROM users WHERE id = ?';
     const users = await DatabaseService.query<User[]>(sql, [id]);
     return users[0] || null;
   }
