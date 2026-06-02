@@ -70,7 +70,13 @@ export class UsersModel {
       VALUES (?, ?, ?, ?, ?)
     `;
 
-    const result = await DatabaseService.execute(sql, [username, password_hash, role, nickname, avatar_url]);
+    const result = await DatabaseService.execute(sql, [
+      username,
+      password_hash,
+      role,
+      nickname ?? null,
+      avatar_url ?? null,
+    ]);
     return result.insertId;
   }
 
