@@ -2,7 +2,7 @@
 import WechatLoginButton from '@/components/WechatLoginButton.vue'
 
 const wechatAppId = import.meta.env.VITE_WECHAT_APP_ID || ''
-const redirectUri = `${window.location.origin}/auth/callback`
+const redirectUri = import.meta.env.VITE_WECHAT_REDIRECT_URI || `${window.location.origin}/auth/callback`
 </script>
 
 <template>
