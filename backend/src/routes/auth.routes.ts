@@ -3,8 +3,14 @@ import { AuthController } from '../controllers/auth.controller';
 
 const router = Router();
 
-// GET /api/auth/wechat/callback?code=xxx
-router.get('/auth/wechat/callback', AuthController.wechatCallback);
+// GET /api/auth/captcha
+router.get('/auth/captcha', AuthController.getCaptcha);
+
+// POST /api/auth/login
+router.post('/auth/login', AuthController.login);
+
+// POST /api/auth/register
+router.post('/auth/register', AuthController.register);
 
 // GET /api/auth/me
 router.get('/auth/me', AuthController.me);

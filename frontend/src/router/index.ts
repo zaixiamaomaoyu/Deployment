@@ -16,9 +16,10 @@ const routes: RouteRecordRaw[] = [
     meta: { guestOnly: true },
   },
   {
-    path: '/auth/callback',
-    name: 'AuthCallback',
-    component: () => import('@/views/AuthCallback.vue'),
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/Register.vue'),
+    meta: { guestOnly: true },
   },
   {
     path: '/contents',

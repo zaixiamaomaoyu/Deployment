@@ -12,13 +12,16 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `openid` VARCHAR(255) NOT NULL COMMENT '微信 OpenID',
+  `username` VARCHAR(50) NOT NULL COMMENT '用户名',
+  `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希',
+  `openid` VARCHAR(255) DEFAULT NULL COMMENT '微信 OpenID',
   `role` ENUM('user', 'admin') NOT NULL DEFAULT 'user' COMMENT '用户角色',
   `nickname` VARCHAR(100) DEFAULT NULL COMMENT '用户昵称',
   `avatar_url` VARCHAR(500) DEFAULT NULL COMMENT '头像URL',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`),
   UNIQUE KEY `uk_openid` (`openid`),
   KEY `idx_role` (`role`),
   KEY `idx_created_at` (`created_at`)

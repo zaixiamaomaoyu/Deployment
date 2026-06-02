@@ -7,10 +7,24 @@ const api = axios.create({
 
 export interface UserInfo {
   id: number
-  openid: string
+  openid?: string
   nickname: string | null
   avatar_url: string | null
   role: 'user' | 'admin'
+}
+
+export interface LoginCredentials {
+  username: string
+  password: string
+  captcha: string
+  remember?: boolean
+}
+
+export interface RegisterData {
+  username: string
+  password: string
+  confirmPassword: string
+  captcha: string
 }
 
 export async function getCurrentUser(): Promise<UserInfo> {
@@ -22,7 +36,19 @@ export async function logout(): Promise<void> {
   await api.post('/auth/logout')
 }
 
-export async function wechatCallback(code: string): Promise<UserInfo> {
-  const res = await api.get(`/auth/wechat/callback?code=${encodeURIComponent(code)}`)
+export async function login(credentials: LoginCredentials): Promise<UserInfo> {
+  const res = await api.post('/auth/login', credentials)
   return res.data
+}
+
+export async function register(data: RegisterData): Promise<UserInfo> {
+  const res = await api.post('/auth/register', data)
+  return res.data
+}
+
+export async function getCaptcha(): Promise<string> {
+  const res = await api.get('/auth/captcha', {
+    responseType: 'blob',
+  })
+  return URL.createObjectURL(res.data)
 }

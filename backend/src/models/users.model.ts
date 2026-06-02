@@ -3,7 +3,9 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 export interface User extends RowDataPacket {
   id: number;
-  openid: string;
+  username: string;
+  password_hash: string;
+  openid?: string | null;
   role: 'user' | 'admin';
   nickname?: string;
   avatar_url?: string;
@@ -12,7 +14,15 @@ export interface User extends RowDataPacket {
 }
 
 export interface CreateUserDto {
-  openid: string;
+  openid?: string;
+  role?: 'user' | 'admin';
+  nickname?: string;
+  avatar_url?: string;
+}
+
+export interface CreateUserWithPasswordDto {
+  username: string;
+  password_hash: string;
   role?: 'user' | 'admin';
   nickname?: string;
   avatar_url?: string;
@@ -37,6 +47,30 @@ export class UsersModel {
     `;
 
     const result = await DatabaseService.execute(sql, [openid, role, nickname, avatar_url]);
+    return result.insertId;
+  }
+
+  /**
+   * 根据用户名查找用户
+   */
+  static async findByUsername(username: string): Promise<User | null> {
+    const sql = 'SELECT * FROM users WHERE username = ?';
+    const users = await DatabaseService.query<User[]>(sql, [username]);
+    return users[0] || null;
+  }
+
+  /**
+   * 创建带密码的用户
+   */
+  static async createUserWithPassword(userData: CreateUserWithPasswordDto): Promise<number> {
+    const { username, password_hash, role = 'user', nickname, avatar_url } = userData;
+
+    const sql = `
+      INSERT INTO users (username, password_hash, role, nickname, avatar_url)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+
+    const result = await DatabaseService.execute(sql, [username, password_hash, role, nickname, avatar_url]);
     return result.insertId;
   }
 

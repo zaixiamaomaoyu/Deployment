@@ -9,11 +9,6 @@ export const env = cleanEnv(process.env, {
   DB_USER: str(),
   DB_PASSWORD: str(),
 
-  // WeChat
-  WECHAT_APP_ID: str(),
-  WECHAT_APP_SECRET: str(),
-  WECHAT_REDIRECT_URI: url(),
-
   // Claude API
   CLAUDE_API_KEY: str(),
   CLAUDE_API_URL: url({ default: 'https://api.anthropic.com/v1/messages' }),

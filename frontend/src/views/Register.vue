@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { login, getCaptcha } from '@/api/auth'
+import { register, getCaptcha } from '@/api/auth'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -12,20 +12,48 @@ const formRef = ref<FormInstance>()
 const loading = ref(false)
 const captchaUrl = ref('')
 const passwordVisible = ref(false)
+const confirmVisible = ref(false)
 
 const form = reactive({
   username: '',
   password: '',
+  confirmPassword: '',
   captcha: '',
-  remember: false,
 })
+
+const passwordStrength = computed(() => {
+  if (!form.password) return ''
+  if (form.password.length < 6) return '弱'
+  if (form.password.length < 10) return '中'
+  return '强'
+})
+
+const strengthColor = computed(() => {
+  if (passwordStrength.value === '弱') return '#f56c6c'
+  if (passwordStrength.value === '中') return '#e6a23c'
+  return '#67c23a'
+})
+
+const validateConfirmPassword = (_rule: any, value: string, callback: Function) => {
+  if (value !== form.password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
 
 const rules: FormRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 50, message: '用户名长度为3-50位', trigger: 'blur' },
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少需要6位', trigger: 'blur' },
+  ],
+  confirmPassword: [
+    { required: true, message: '请确认密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' },
   ],
   captcha: [
     { required: true, message: '请输入验证码', trigger: 'blur' },
@@ -48,18 +76,18 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    const user = await login({
+    const user = await register({
       username: form.username,
       password: form.password,
+      confirmPassword: form.confirmPassword,
       captcha: form.captcha,
-      remember: form.remember,
     })
     userStore.setUser(user)
     await userStore.fetchUserInfo()
-    ElMessage.success('登录成功')
+    ElMessage.success('注册成功')
     router.push('/')
   } catch (err: any) {
-    const msg = err?.response?.data?.message || err?.message || '登录失败'
+    const msg = err?.response?.data?.message || err?.message || '注册失败'
     ElMessage.error(msg)
     await refreshCaptcha()
     form.captcha = ''
@@ -74,8 +102,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="login-page">
-    <el-card class="login-card" shadow="hover">
+  <div class="register-page">
+    <el-card class="register-card" shadow="hover">
       <div class="logo">
         <h1>Deployment Learning</h1>
         <p class="subtitle">部署知识学习平台</p>
@@ -86,7 +114,7 @@ onMounted(() => {
         :model="form"
         :rules="rules"
         label-position="top"
-        class="login-form"
+        class="register-form"
         @submit.prevent="handleSubmit"
       >
         <el-form-item label="用户名" prop="username">
@@ -102,13 +130,34 @@ onMounted(() => {
           <el-input
             v-model="form.password"
             :type="passwordVisible ? 'text' : 'password'"
-            placeholder="请输入密码"
+            placeholder="请输入密码（至少6位）"
             size="large"
             clearable
           >
             <template #suffix>
               <el-icon @click="passwordVisible = !passwordVisible" class="toggle-icon">
                 <View v-if="passwordVisible" />
+                <Hide v-else />
+              </el-icon>
+            </template>
+          </el-input>
+          <div v-if="form.password" class="strength-bar">
+            <span class="strength-label">密码强度：</span>
+            <span class="strength-value" :style="{ color: strengthColor }">{{ passwordStrength }}</span>
+          </div>
+        </el-form-item>
+
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="form.confirmPassword"
+            :type="confirmVisible ? 'text' : 'password'"
+            placeholder="请再次输入密码"
+            size="large"
+            clearable
+          >
+            <template #suffix>
+              <el-icon @click="confirmVisible = !confirmVisible" class="toggle-icon">
+                <View v-if="confirmVisible" />
                 <Hide v-else />
               </el-icon>
             </template>
@@ -135,10 +184,6 @@ onMounted(() => {
         </el-form-item>
 
         <el-form-item>
-          <el-checkbox v-model="form.remember">记住我</el-checkbox>
-        </el-form-item>
-
-        <el-form-item>
           <el-button
             type="primary"
             size="large"
@@ -146,21 +191,21 @@ onMounted(() => {
             :loading="loading"
             @click="handleSubmit"
           >
-            登录
+            注册
           </el-button>
         </el-form-item>
       </el-form>
 
       <div class="extra-links">
-        <span>还没有账号？</span>
-        <el-link type="primary" @click="router.push('/register')">立即注册</el-link>
+        <span>已有账号？</span>
+        <el-link type="primary" @click="router.push('/login')">立即登录</el-link>
       </div>
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.login-page {
+.register-page {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -168,7 +213,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
 }
-.login-card {
+.register-card {
   width: 100%;
   max-width: 420px;
   text-align: center;
@@ -184,12 +229,22 @@ onMounted(() => {
   font-size: 14px;
   margin-bottom: 32px;
 }
-.login-form {
+.register-form {
   text-align: left;
 }
 .toggle-icon {
   cursor: pointer;
   color: #909399;
+}
+.strength-bar {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.strength-label {
+  color: #909399;
+}
+.strength-value {
+  font-weight: 600;
 }
 .captcha-row {
   display: flex;

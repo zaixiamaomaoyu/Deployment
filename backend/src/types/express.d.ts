@@ -1,8 +1,15 @@
 import 'express-session';
 
 declare module 'express-session' {
+  interface CaptchaData {
+    text: string;
+    expires: number;
+    attempts: number;
+  }
+
   interface SessionData {
     userId?: number;
+    captcha?: CaptchaData;
   }
 }
 
@@ -11,7 +18,7 @@ declare global {
     interface Request {
       user?: {
         id: number;
-        openid: string;
+        username: string;
         role: 'user' | 'admin';
       };
     }

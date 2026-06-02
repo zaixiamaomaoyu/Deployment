@@ -10,9 +10,6 @@ describe('Environment Variables', () => {
       ...originalEnv,
       DB_USER: 'test_user',
       DB_PASSWORD: 'test_password',
-      WECHAT_APP_ID: 'test_app_id',
-      WECHAT_APP_SECRET: 'test_secret',
-      WECHAT_REDIRECT_URI: 'http://localhost:3000/callback',
       CLAUDE_API_KEY: 'test_claude_key',
       SESSION_SECRET: 'test_session_secret',
       CORS_ORIGIN: 'http://localhost:5173'
@@ -23,7 +20,7 @@ describe('Environment Variables', () => {
       const testEnv = require('../env').env;
       expect(testEnv.DB_USER).toBe('test_user');
       expect(testEnv.DB_PASSWORD).toBe('test_password');
-      expect(testEnv.WECHAT_APP_ID).toBe('test_app_id');
+      expect(testEnv.CORS_ORIGIN).toBe('http://localhost:5173');
       expect(testEnv.CLAUDE_API_KEY).toBe('test_claude_key');
     }).not.toThrow();
 

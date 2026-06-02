@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 
 export interface UserInfo {
   id: number
-  openid: string
+  openid?: string
   nickname: string | null
   avatar_url: string | null
   role: 'user' | 'admin'
