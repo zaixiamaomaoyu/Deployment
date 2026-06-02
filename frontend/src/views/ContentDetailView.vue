@@ -68,7 +68,12 @@ function formatDate(dateStr: string): string {
 }
 
 function goTo(id: number) {
-  router.push(`/contents/${id}`)
+  // 跳转上/下一篇时保留 domain query，保持导航范围一致
+  const domainQuery = typeof route.query.domain === 'string' ? route.query.domain : undefined
+  router.push({
+    path: `/contents/${id}`,
+    query: domainQuery ? { domain: domainQuery } : {},
+  })
 }
 
 async function handleToggleFavorite() {
@@ -117,10 +122,13 @@ async function loadData() {
   favoriteLoading.value = false
 
   try {
+    // 入口 domain：决定 neighbors 范围（全部 / 同 domain）
+    const domainQuery = typeof route.query.domain === 'string' ? route.query.domain : undefined
+
     // 主内容、neighbors、收藏状态（已登录）并发请求
     const requests: Promise<unknown>[] = [
       getContentById(id),
-      getContentNeighbors(id),
+      getContentNeighbors(id, domainQuery),
     ]
     if (userStore.isLoggedIn) {
       requests.push(getFavoriteStatus(id))
@@ -181,9 +189,13 @@ onMounted(() => {
   loadData()
 })
 
-watch(() => route.params.id, () => {
-  loadData()
-})
+// 监听路由参数变化（id 或 domain scope）以重新加载
+watch(
+  () => [route.params.id, route.query.domain] as const,
+  () => {
+    loadData()
+  }
+)
 </script>
 
 <template>
@@ -277,7 +289,7 @@ watch(() => route.params.id, () => {
 
 <style scoped>
 .content-detail {
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px 16px;
 }

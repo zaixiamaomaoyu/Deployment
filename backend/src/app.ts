@@ -29,10 +29,12 @@ app.use(helmet({
   },
 }));
 
-// 速率限制
+// 速率限制（dev 环境放宽以避免开发期间误触；prod 保持严格）
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: 100, // 限制每个IP 100个请求
+  max: env.NODE_ENV === 'production' ? 100 : 2000,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后再试' }
 });
 app.use(limiter);

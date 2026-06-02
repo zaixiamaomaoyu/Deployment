@@ -6,12 +6,17 @@ import HighlightText from './HighlightText.vue'
 const props = defineProps<{
   content: Content
   highlight?: string
+  fromDomain?: string
 }>()
 
 const router = useRouter()
 
 function handleClick() {
-  router.push(`/contents/${props.content.id}`)
+  const query = props.fromDomain ? { domain: props.fromDomain } : undefined
+  router.push({
+    path: `/contents/${props.content.id}`,
+    query,
+  })
 }
 
 const domainLabels: Record<string, string> = {

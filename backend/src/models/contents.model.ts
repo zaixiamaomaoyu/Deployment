@@ -282,17 +282,28 @@ export class ContentsModel {
 
   /**
    * 获取相邻内容（上一篇/下一篇）
+   * - 提供 domain：限制在同 domain 内按 id 顺序导航
+   * - 不提供 domain：按全局 id 顺序导航
    */
-  static async findNeighbors(id: number): Promise<{ prev: Content | null; next: Content | null }> {
+  static async findNeighbors(
+    id: number,
+    domain?: string
+  ): Promise<{ prev: Content | null; next: Content | null }> {
+    const useDomainScope = typeof domain === 'string' && domain.length > 0;
+
+    const prevSql = useDomainScope
+      ? 'SELECT * FROM contents WHERE domain = ? AND id < ? ORDER BY id DESC LIMIT 1'
+      : 'SELECT * FROM contents WHERE id < ? ORDER BY id DESC LIMIT 1';
+    const nextSql = useDomainScope
+      ? 'SELECT * FROM contents WHERE domain = ? AND id > ? ORDER BY id ASC LIMIT 1'
+      : 'SELECT * FROM contents WHERE id > ? ORDER BY id ASC LIMIT 1';
+
+    const prevParams = useDomainScope ? [domain, id] : [id];
+    const nextParams = useDomainScope ? [domain, id] : [id];
+
     const [prevResult, nextResult] = await Promise.all([
-      DatabaseService.query<Content[]>(
-        'SELECT * FROM contents WHERE id < ? ORDER BY id DESC LIMIT 1',
-        [id]
-      ),
-      DatabaseService.query<Content[]>(
-        'SELECT * FROM contents WHERE id > ? ORDER BY id ASC LIMIT 1',
-        [id]
-      ),
+      DatabaseService.query<Content[]>(prevSql, prevParams),
+      DatabaseService.query<Content[]>(nextSql, nextParams),
     ]);
 
     const prev = prevResult[0] || null;

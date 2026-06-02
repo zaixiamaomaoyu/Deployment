@@ -56,11 +56,15 @@ export async function getContentById(id: number): Promise<{ code: string; data: 
   return res.data
 }
 
-export async function getContentNeighbors(id: number): Promise<{
+export async function getContentNeighbors(
+  id: number,
+  domain?: string
+): Promise<{
   code: string
   data: { prev: Content | null; next: Content | null }
   message: string
 }> {
-  const res = await api.get(`/contents/${id}/neighbors`)
+  const params = domain ? { domain } : undefined
+  const res = await api.get(`/contents/${id}/neighbors`, { params })
   return res.data
 }

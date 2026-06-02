@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { TabsPaneContext } from 'element-plus'
 import { getContents, type Content } from '@/api/contents'
 import ContentCard from '@/components/ContentCard.vue'
+
+const route = useRoute()
 
 const loading = ref(false)
 const contents = ref<Content[]>([])
@@ -32,6 +35,8 @@ const domainLabels: Record<string, string> = {
   container: '容器',
 }
 
+const validDomains = new Set(Object.keys(domainLabels))
+
 const domainKeys = Object.keys(domainLabels)
 
 const levelOptions = [
@@ -42,6 +47,28 @@ const levelOptions = [
   { label: 'Lv4', value: 4 },
   { label: 'Lv5', value: 5 },
 ]
+
+// 从 URL query 同步筛选状态到本地 ref（仅消费有效值，忽略非法）
+function applyQuery() {
+  const { domain, search, level } = route.query
+
+  if (typeof domain === 'string' && validDomains.has(domain)) {
+    activeDomain.value = domain
+  } else if (domain === undefined || domain === '') {
+    // 无 domain query 时不强制覆盖，保留当前 tab（避免页面内 tab 切换被 URL 影响）
+  }
+
+  if (typeof search === 'string') {
+    searchQuery.value = search
+  }
+
+  if (typeof level === 'string' && level !== '') {
+    const num = Number(level)
+    if (Number.isInteger(num) && num >= 1 && num <= 5) {
+      activeLevel.value = num
+    }
+  }
+}
 
 async function loadData() {
   // 取消之前的请求
@@ -99,8 +126,18 @@ function handleLevelChange() {
 }
 
 onMounted(() => {
+  applyQuery()
   loadData()
 })
+
+// 监听路由 query 变化（例如从首页切换不同领域卡片进入此页）
+watch(
+  () => route.query,
+  () => {
+    applyQuery()
+    loadData()
+  }
+)
 
 onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -184,7 +221,11 @@ onUnmounted(() => {
               :lg="8"
               class="content-col"
             >
-              <ContentCard :content="content" :highlight="searchQuery" />
+              <ContentCard
+                :content="content"
+                :highlight="searchQuery"
+                :from-domain="key"
+              />
             </el-col>
           </el-row>
         </div>

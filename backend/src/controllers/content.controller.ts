@@ -127,7 +127,9 @@ export class ContentController {
 
   /**
    * 获取相邻内容（上一篇/下一篇）
-   * GET /api/contents/:id/neighbors
+   * GET /api/contents/:id/neighbors?domain=
+   * - domain 缺省：按全局 id 顺序导航
+   * - domain 提供且在白名单内：限制在同 domain 内导航
    */
   static async getNeighbors(req: Request, res: Response): Promise<void> {
     try {
@@ -150,7 +152,14 @@ export class ContentController {
         return;
       }
 
-      const neighbors = await ContentsModel.findNeighbors(id);
+      // 可选 domain scope：必须为合法领域，否则忽略
+      const rawDomain = req.query.domain;
+      let domain: string | undefined;
+      if (typeof rawDomain === 'string' && VALID_DOMAINS.includes(rawDomain)) {
+        domain = rawDomain;
+      }
+
+      const neighbors = await ContentsModel.findNeighbors(id, domain);
 
       res.json({
         code: 'SUCCESS',
