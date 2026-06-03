@@ -36,7 +36,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/favorites',
     name: 'Favorites',
-    component: () => import('@/views/Home.vue'),
+    component: () => import('@/views/FavoritesView.vue'),
     meta: { requiresAuth: true },
   },
   {
@@ -60,7 +60,7 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
-    return next('/login')
+    return next({ path: '/login', query: { redirect: to.fullPath } })
   }
 
   if (to.meta.requiresAdmin && !userStore.isAdmin) {

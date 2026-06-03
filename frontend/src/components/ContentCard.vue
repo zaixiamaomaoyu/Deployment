@@ -81,6 +81,7 @@ function getDomainMeta(domain: string) {
           查看详情
           <el-icon><ArrowRight /></el-icon>
         </span>
+        <slot name="extra" />
       </div>
     </div>
   </div>

@@ -8,6 +8,23 @@ export interface Favorite extends RowDataPacket {
   created_at: Date;
 }
 
+/**
+ * 收藏列表项（JOIN contents 后的扁平结构）
+ * - id / domain / level / title / description / created_at / updated_at 来自 contents
+ * - favorite_id / favorited_at 来自 favorites
+ */
+export interface FavoriteWithContent extends RowDataPacket {
+  id: number;
+  domain: string;
+  level: number;
+  title: string;
+  description?: string;
+  created_at: Date;
+  updated_at: Date;
+  favorite_id: number;
+  favorited_at: Date;
+}
+
 export class FavoritesModel {
   /**
    * 添加收藏
@@ -49,17 +66,26 @@ export class FavoritesModel {
   }
 
   /**
-   * 获取用户的收藏列表
+   * 获取用户的收藏列表（含内容详情）
+   * JOIN contents 表，显式列出列名以避免列名冲突（c.id 与 f.id 重名）
    */
   static async findByUser(userId: number, page: number = 1, limit: number = 10): Promise<{
-    favorites: Favorite[];
+    favorites: FavoriteWithContent[];
     total: number;
   }> {
     const offset = (page - 1) * limit;
 
     const [favorites, totalResult] = await Promise.all([
-      DatabaseService.query<Favorite[]>(
-        'SELECT * FROM favorites WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      DatabaseService.query<FavoriteWithContent[]>(
+        `SELECT
+           c.id, c.domain, c.level, c.title, c.description,
+           c.created_at, c.updated_at,
+           f.id AS favorite_id, f.created_at AS favorited_at
+         FROM favorites f
+         INNER JOIN contents c ON c.id = f.content_id
+         WHERE f.user_id = ?
+         ORDER BY f.created_at DESC
+         LIMIT ? OFFSET ?`,
         [userId, limit, offset]
       ),
       DatabaseService.query<RowDataPacket[]>(
