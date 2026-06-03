@@ -279,4 +279,244 @@ describe('FavoriteController', () => {
       });
     });
   });
+
+  describe('list', () => {
+    it('returns 401 when not logged in', async () => {
+      req.session = undefined as any;
+      req.query = {};
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'UNAUTHORIZED',
+        message: '请先登录',
+      });
+      expect(FavoritesModel.findByUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid page=0', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '0' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+      expect(FavoritesModel.findByUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 for invalid page=-1', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '-1' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for non-numeric page', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: 'abc' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for invalid limit=-1', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { limit: '-1' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for limit > 100', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { limit: '101' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for scientific notation limit', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { limit: '1e2' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for page with whitespace', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: ' 1 ' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for hexadecimal limit', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { limit: '0x10' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns empty array when user has no favorites', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '1', limit: '10' };
+      (FavoritesModel.findByUser as jest.Mock).mockResolvedValue({
+        favorites: [],
+        total: 0,
+      });
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(FavoritesModel.findByUser).toHaveBeenCalledWith(1, 1, 10);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'SUCCESS',
+        data: { favorites: [], total: 0 },
+        message: '获取收藏列表成功',
+      });
+    });
+
+    it('returns paginated favorites when user has favorites', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '2', limit: '10' };
+      const mockFavorites = [
+        { id: 10, title: 'Favorite 10', content: 'content' },
+        { id: 11, title: 'Favorite 11', content: 'content' },
+      ];
+      (FavoritesModel.findByUser as jest.Mock).mockResolvedValue({
+        favorites: mockFavorites,
+        total: 20,
+      });
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(FavoritesModel.findByUser).toHaveBeenCalledWith(1, 2, 10);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'SUCCESS',
+        data: { favorites: mockFavorites, total: 20 },
+        message: '获取收藏列表成功',
+      });
+    });
+
+    it('returns 500 when model throws', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '1', limit: '10' };
+      (FavoritesModel.findByUser as jest.Mock).mockRejectedValue(new Error('DB error'));
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(500);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'INTERNAL_ERROR',
+        message: '获取收藏列表失败',
+      });
+    });
+
+    it('uses default values when page/limit not provided', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = {};
+      (FavoritesModel.findByUser as jest.Mock).mockResolvedValue({
+        favorites: [],
+        total: 0,
+      });
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(FavoritesModel.findByUser).toHaveBeenCalledWith(1, 1, 10);
+    });
+
+    it('uses provided page when specified', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '3', limit: '10' } as any;
+      (FavoritesModel.findByUser as jest.Mock).mockResolvedValue({
+        favorites: [],
+        total: 0,
+      });
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(FavoritesModel.findByUser).toHaveBeenCalledWith(1, 3, 10);
+    });
+
+    it('uses provided limit when specified', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '1', limit: '20' } as any;
+      (FavoritesModel.findByUser as jest.Mock).mockResolvedValue({
+        favorites: [],
+        total: 0,
+      });
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(FavoritesModel.findByUser).toHaveBeenCalledWith(1, 1, 20);
+    });
+
+    it('returns 400 for empty string page', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: '' };
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+
+    it('returns 400 for array page query (?page=1&page=2)', async () => {
+      req.session = { userId: 1 } as any;
+      req.query = { page: ['1', '2'] } as any;
+
+      await FavoriteController.list(req as Request, res as Response);
+
+      expect(statusMock).toHaveBeenCalledWith(400);
+      expect(jsonMock).toHaveBeenCalledWith({
+        code: 'VALIDATION_ERROR',
+        message: 'page 和 limit 必须为正整数且不超过 100',
+      });
+    });
+  });
 });
