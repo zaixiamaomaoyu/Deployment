@@ -1,3 +1,9 @@
+## Deferred from: code review of 2-6-收藏列表页 (2026-06-03)
+
+- **FavoritesModel.toggle 非事务 read-then-write 并发竞态** [backend/src/models/favorites.model.ts:80-99] — `isFavorited` 与 `add/remove` 之间无事务无锁，多端并发 TOCTOU。Story 2-5 遗留，需改原子 SQL 或事务；本 Story 2-6 改动未触及该函数主体
+- **parsePositiveContentId 上限 2147483647 与 schema 不对齐** [backend/src/controllers/favorites.controller.ts:11] — 若 `contents.id` 为 `INT UNSIGNED`（max 4294967295），上限应同步放宽；需先核对 schema 后统一调整
+- **FavoritesModel.getStats 未挂载路由但代码留存** [backend/src/models/favorites.model.ts:101-124] — 当前未暴露，未来若不小心暴露管理员路由会泄露全站统计；建议清理或加 `@adminOnly`
+
 ## Deferred from: code review of 2-5-内容收藏功能 (2026-06-02)
 
 - 并发 toggle 唯一索引冲突 / `FavoritesModel.toggle` 非事务 [backend/src/models/favorites.model.ts:80-99] — FavoritesModel 在 story 开始前已就位，spec 明确禁止重新实现；并发 toggle 在 MySQL 唯一索引下偶发 500，需改用事务或 `INSERT ... ON DUPLICATE KEY UPDATE`

@@ -38,6 +38,11 @@ logs
 coverage/
 *.lcov
 
+# Playwright 测试产物
+test-results/
+playwright-report/
+blob-report/
+
 # Debug
 dump.rdb
 
