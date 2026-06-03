@@ -52,6 +52,14 @@ function handleSearch() {
           </a>
           <a
             class="nav-link"
+            :class="{ active: $route.path.startsWith('/deployment') }"
+            @click="router.push('/deployment/decision-tree')"
+          >
+            <span class="nav-link__icon">🤔</span>
+            部署决策树
+          </a>
+          <a
+            class="nav-link"
             :class="{ active: $route.path.startsWith('/contents') }"
             @click="router.push('/contents')"
           >

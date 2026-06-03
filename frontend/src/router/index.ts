@@ -45,6 +45,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Home.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
+  {
+    path: '/deployment/decision-tree',
+    name: 'decision-tree',
+    component: () => import('@/views/DecisionTreePage.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
+    path: '/deployment/decision-tree/result',
+    name: 'decision-result',
+    component: () => import('@/views/DecisionResultView.vue'),
+    meta: { requiresAuth: false },
+  },
 ]
 
 const router = createRouter({
