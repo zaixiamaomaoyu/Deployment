@@ -1,3 +1,9 @@
+## Deferred from: code review of 3-2-决策树数据设计 (2026-06-03)
+
+- **`depthOf`/`collectLeafDepths` 测试工具函数算法脆弱** [frontend/src/data/__tests__/decision-tree-data.spec.ts:9-30] — 每次递归 `new Set(visited)` 致环检测在工具函数内失效；测试内部辅助函数，且独立 dfs 用例已守护环检测不变量
+- **环检测算法在 DAG（共享子树）场景下理论漏报** [frontend/src/data/__tests__/decision-tree-data.spec.ts:61-76] — 全局 `visited` 剪枝与 `path.includes` 判环在 DAG 中可能漏报；当前数据为纯树结构，AC #4 未要求支持 DAG
+- **`useDecisionTree.estimateMaxDepth` 自环场景下 progress 估算失真** [frontend/src/composables/useDecisionTree.ts:19-29] — Story 3-1 既有逻辑，本 Story 数据校验测试已守护「无环」不变量，未引入新风险
+
 ## Deferred from: code review of 2-6-收藏列表页 (2026-06-03)
 
 - **FavoritesModel.toggle 非事务 read-then-write 并发竞态** [backend/src/models/favorites.model.ts:80-99] — `isFavorited` 与 `add/remove` 之间无事务无锁，多端并发 TOCTOU。Story 2-5 遗留，需改原子 SQL 或事务；本 Story 2-6 改动未触及该函数主体
