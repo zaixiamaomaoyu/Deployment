@@ -58,6 +58,15 @@ function handleSearch() {
             <span class="nav-link__icon">📚</span>
             知识内容
           </a>
+          <a
+            v-if="userStore.isLoggedIn"
+            class="nav-link"
+            :class="{ active: $route.path === '/favorites' }"
+            @click="router.push('/favorites')"
+          >
+            <span class="nav-link__icon">⭐</span>
+            我的收藏
+          </a>
         </nav>
       </div>
 
