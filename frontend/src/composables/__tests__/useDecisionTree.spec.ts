@@ -49,6 +49,24 @@ describe('useDecisionTree — 初始状态', () => {
     const { canGoBack } = useDecisionTree(fixture)
     expect(canGoBack.value).toBe(false)
   })
+
+  it('isFinished 初始为 false', () => {
+    const { isFinished } = useDecisionTree(fixture)
+    expect(isFinished.value).toBe(false)
+  })
+})
+
+describe('useDecisionTree — initialNodeId 参数（F5）', () => {
+  it('传入 initialNodeId 时从指定节点启动', () => {
+    const { currentNode, isRoot } = useDecisionTree(fixture, 'q2')
+    expect(currentNode.value?.id).toBe('q2')
+    expect(isRoot.value).toBe(false)
+  })
+
+  it('initialNodeId 指向不存在节点时回退到 rootId', () => {
+    const { currentNode } = useDecisionTree(fixture, 'missing')
+    expect(currentNode.value?.id).toBe('q1')
+  })
 })
 
 describe('useDecisionTree — selectOption 非叶子', () => {
@@ -76,6 +94,31 @@ describe('useDecisionTree — selectOption 叶子', () => {
       ])
       expect(outcome.payload.result).toEqual({ planId: 'vps', planName: 'VPS 自建' })
     }
+    expect(state.isFinished.value).toBe(true)
+  })
+})
+
+describe('useDecisionTree — 叶子无 result（F3 单独分支）', () => {
+  it('叶子无 result → 返回 null，answers 回滚，warn 文案准确', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const data: DecisionTreeData = {
+      rootId: 'q1',
+      nodes: {
+        q1: {
+          id: 'q1',
+          question: 'Q1',
+          options: [{ id: 'a1', label: 'A', nextId: null }], // nextId=null 但无 result
+        },
+      },
+    }
+    const state = useDecisionTree(data)
+    const outcome = state.selectOption(data.nodes.q1.options[0])
+    expect(outcome).toBeNull()
+    expect(state.answers.value).toEqual([])
+    expect(state.isFinished.value).toBe(false)
+    // F3: warn 文案应包含「是叶子但缺少 result」
+    expect(warnSpy.mock.calls[0][0]).toContain('是叶子但缺少 result')
+    warnSpy.mockRestore()
   })
 })
 
@@ -102,7 +145,7 @@ describe('useDecisionTree — nextId 指向不存在节点', () => {
   })
 })
 
-describe('useDecisionTree — goBack', () => {
+describe('useDecisionTree — goBack（F8 显式守卫）', () => {
   it('根节点调用 goBack 返回 null，状态不变', () => {
     const state = useDecisionTree(fixture)
     expect(state.goBack()).toBeNull()
@@ -110,7 +153,7 @@ describe('useDecisionTree — goBack', () => {
     expect(state.answers.value).toEqual([])
   })
 
-  it('第 2 题调用 goBack → answers 弹出、currentNodeId 回退', () => {
+  it('第 2 题调用 goBack → answers 弹出、currentNodeId 回退、isFinished 重置', () => {
     const state = useDecisionTree(fixture)
     state.selectOption(fixture.nodes.q1.options[0]) // → q2
     const prev = state.goBack()
@@ -119,16 +162,40 @@ describe('useDecisionTree — goBack', () => {
     expect(state.answers.value).toEqual([])
     expect(state.canGoBack.value).toBe(false)
   })
+
+  it('结果态调用 goBack → isFinished 重置为 false', () => {
+    const state = useDecisionTree(fixture)
+    state.selectOption(fixture.nodes.q1.options[0]) // q1 → q2
+    state.selectOption(fixture.nodes.q2.options[0]) // q2 → 叶子（finished）
+    expect(state.isFinished.value).toBe(true)
+    state.goBack()
+    expect(state.isFinished.value).toBe(false)
+  })
+
+  it('answers 为空数组时 goBack 不抛错（F8 守卫）', () => {
+    const state = useDecisionTree(fixture)
+    // 直接清空 answers 模拟并发场景
+    state.answers.value = []
+    expect(state.goBack()).toBeNull()
+  })
 })
 
 describe('useDecisionTree — reset', () => {
-  it('reset 后回到根节点、answers 清空', () => {
+  it('reset 后回到根节点、answers 清空、isFinished 重置', () => {
     const state = useDecisionTree(fixture)
     state.selectOption(fixture.nodes.q1.options[0])
     state.reset()
     expect(state.currentNodeId.value).toBe('q1')
     expect(state.answers.value).toEqual([])
     expect(state.isRoot.value).toBe(true)
+    expect(state.isFinished.value).toBe(false)
+  })
+
+  it('initialNodeId 启动时 reset 回到 initialNodeId 而非 rootId', () => {
+    const state = useDecisionTree(fixture, 'q2')
+    state.selectOption(fixture.nodes.q2.options[0]) // 推进到叶子
+    state.reset()
+    expect(state.currentNodeId.value).toBe('q2')
   })
 })
 
@@ -159,7 +226,7 @@ describe('useDecisionTree — empty 数据', () => {
   })
 })
 
-describe('useDecisionTree — progress', () => {
+describe('useDecisionTree — progress（F13 clamp）', () => {
   it('根节点 progress.current = 1，total ≥ 1', () => {
     const state = useDecisionTree(fixture)
     expect(state.progress.value.current).toBe(1)
@@ -170,6 +237,20 @@ describe('useDecisionTree — progress', () => {
     const state = useDecisionTree(fixture)
     state.selectOption(fixture.nodes.q1.options[0]) // → q2
     expect(state.progress.value.current).toBe(2)
+  })
+
+  it('total 被 clamp 在 [1, 20] 范围内（F13）', () => {
+    // 构造深链 25 层，验证 total clamp 在 20
+    const deep: DecisionTreeData = { rootId: 'n1', nodes: {} }
+    for (let i = 1; i <= 25; i++) {
+      deep.nodes[`n${i}`] = {
+        id: `n${i}`,
+        question: `Q${i}`,
+        options: [{ id: `o${i}`, label: `O${i}`, nextId: i < 25 ? `n${i + 1}` : null }],
+      }
+    }
+    const state = useDecisionTree(deep)
+    expect(state.progress.value.total).toBe(20) // 被 clamp 到 20
   })
 })
 
@@ -189,7 +270,6 @@ describe('useDecisionTree — estimateMaxDepth（环检测）', () => {
       },
     }
     const state = useDecisionTree(cyclic)
-    // 能正常返回 finite number（不挂死）即可
     expect(typeof state.progress.value.total).toBe('number')
     expect(state.progress.value.total).toBeGreaterThanOrEqual(1)
   })

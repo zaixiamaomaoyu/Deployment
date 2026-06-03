@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { nextTick } from 'vue'
 import DecisionTree from '../DecisionTree.vue'
 import type { DecisionTreeData } from '@/types/decision-tree'
 
@@ -32,9 +33,9 @@ const fixture: DecisionTreeData = {
   },
 }
 
-function mountTree(data: DecisionTreeData = fixture) {
+function mountTree(data: DecisionTreeData = fixture, initialNodeId?: string) {
   return mount(DecisionTree, {
-    props: { data },
+    props: initialNodeId ? { data, initialNodeId } : { data },
     attachTo: document.body,
   })
 }
@@ -57,10 +58,10 @@ describe('DecisionTree — 渲染（问答态）', () => {
     expect(wrapper.find('[data-testid="dt-option-a2"]').exists()).toBe(true)
   })
 
-  it('选项按钮具备 role=radio 与 aria-label', () => {
+  it('选项按钮具备 role=button 与 aria-label（F1 决策：role=button）', () => {
     const wrapper = mountTree()
     const opt = wrapper.find('[data-testid="dt-option-a1"]')
-    expect(opt.attributes('role')).toBe('radio')
+    expect(opt.attributes('role')).toBe('button')
     expect(opt.attributes('aria-label')).toBe('有')
   })
 
@@ -155,19 +156,66 @@ describe('DecisionTree — 空数据', () => {
   })
 })
 
-describe('DecisionTree — 键盘', () => {
-  it('Enter 触发当前聚焦选项的 selectOption', async () => {
+describe('DecisionTree — 键盘（F2/F10/F11）', () => {
+  it('ArrowDown 将焦点移到下一个 option（F10: 真实焦点断言）', async () => {
     const wrapper = mountTree()
-    const opt = wrapper.find('[data-testid="dt-option-a1"]')
-    await opt.trigger('keydown', { key: 'Enter' })
-    expect(wrapper.emitted('advance')).toBeTruthy()
+    const opt1 = wrapper.find('[data-testid="dt-option-a1"]').element as HTMLElement
+    const opt2 = wrapper.find('[data-testid="dt-option-a2"]').element as HTMLElement
+    opt1.focus()
+    expect(document.activeElement).toBe(opt1)
+    await wrapper.find('[data-testid="dt-option-a1"]').trigger('keydown', { key: 'ArrowDown' })
+    await nextTick()
+    expect(document.activeElement).toBe(opt2)
   })
 
-  it('ArrowDown 在选项间循环焦点（不报错）', async () => {
+  it('ArrowDown 在单选项节点不报错也不失焦（F11）', async () => {
+    const wrapper = mountTree()
+    // q3 只有 1 个 option，先前进到 q3
+    await wrapper.find('[data-testid="dt-option-a2"]').trigger('click') // q1 → q3
+    const opt = wrapper.find('[data-testid="dt-option-c1"]').element as HTMLElement
+    opt.focus()
+    expect(document.activeElement).toBe(opt)
+    await wrapper.find('[data-testid="dt-option-c1"]').trigger('keydown', { key: 'ArrowDown' })
+    await nextTick()
+    // 单选项：nextIndex === index 早返，焦点保持
+    expect(document.activeElement).toBe(opt)
+  })
+
+  it('Enter 不再触发 keydown 处理（F2: 删除 Enter/Space 分支，依赖原生 click）', async () => {
     const wrapper = mountTree()
     const opt = wrapper.find('[data-testid="dt-option-a1"]')
-    // 主要验证事件被处理（不抛错）
-    await opt.trigger('keydown', { key: 'ArrowDown' })
-    expect(true).toBe(true)
+    // keydown Enter 不应触发 advance（让原生 click 处理）
+    await opt.trigger('keydown', { key: 'Enter' })
+    expect(wrapper.emitted('advance')).toBeFalsy()
+    // 触发原生 click 才推进
+    await opt.trigger('click')
+    expect(wrapper.emitted('advance')).toBeTruthy()
+  })
+})
+
+describe('DecisionTree — 快速连点防护（F12）', () => {
+  it('快速连点同一 option 不会重复 emit advance', async () => {
+    const wrapper = mountTree()
+    const opt = wrapper.find('[data-testid="dt-option-a1"]')
+    // 同步连发 3 次 click（不 await，模拟真实快速连点）
+    void opt.trigger('click')
+    void opt.trigger('click')
+    void opt.trigger('click')
+    await nextTick()
+    const advance = wrapper.emitted('advance')
+    // 第一次推进成功，后续被 isTransitioning 锁拦截
+    expect(advance?.length ?? 0).toBe(1)
+  })
+})
+
+describe('DecisionTree — initialNodeId prop（F5）', () => {
+  it('传入 initialNodeId 时从指定节点启动', () => {
+    const wrapper = mountTree(fixture, 'q2')
+    expect(wrapper.find('[data-testid="dt-question"]').text()).toContain('想花钱吗？')
+  })
+
+  it('initialNodeId 指向不存在节点时回退到 rootId', () => {
+    const wrapper = mountTree(fixture, 'missing')
+    expect(wrapper.find('[data-testid="dt-question"]').text()).toContain('你有服务器吗？')
   })
 })

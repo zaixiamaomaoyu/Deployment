@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useDecisionTree } from '@/composables/useDecisionTree'
 import type {
   DecisionTreeCompletePayload,
@@ -18,41 +18,67 @@ const emit = defineEmits<{
   (e: 'back', node: DecisionTreeNode): void
 }>()
 
-const state = useDecisionTree(props.data)
-const finished = ref(false)
+// F5: initialNodeId 透传到 composable
+const state = useDecisionTree(props.data, props.initialNodeId)
 const finalResult = ref<DecisionTreeCompletePayload | null>(null)
 
-// 父组件切换 data 时重置组件状态
+// 派生：是否处于结果态（F15: 单一派生状态，替代 finished + finalResult 双 ref）
+const isResultState = computed(() => state.isFinished.value && finalResult.value !== null)
+
+// F4: watch data.rootId 而非 props.data 引用，避免父组件无关引用变化触发 reset
 watch(
-  () => props.data,
+  () => props.data.rootId,
   () => {
-    finished.value = false
     finalResult.value = null
     state.reset()
   },
-  { deep: false },
 )
 
+// F5: initialNodeId 变化时也 reset 到新起点
+watch(
+  () => props.initialNodeId,
+  (newVal) => {
+    if (newVal && props.data.nodes[newVal]) {
+      finalResult.value = null
+      state.reset()
+      // reset 内部已使用 startId，但 startId 在闭包中是初始值；
+      // 切换 initialNodeId 时需要让 composable 重新初始化 → 这里通过显式赋值 currentNodeId
+      state.currentNodeId.value = newVal
+    }
+  },
+)
+
+// F12: 切换锁，防止快速连点导致 answers 重复 push
+// 锁延迟一个 microtask 释放，确保同一同步连发序列中的后续点击被拦截
+const isTransitioning = ref(false)
+
+const currentOptions = computed<DecisionTreeOption[]>(() => state.currentNode.value?.options ?? [])
+
 function handleSelect(option: DecisionTreeOption) {
+  if (isTransitioning.value) return
+  isTransitioning.value = true
   const outcome = state.selectOption(option)
-  if (!outcome) return
-  if (outcome.type === 'advance') {
-    finished.value = false
-    emit('advance', outcome.nextNode)
-  } else {
-    finished.value = true
-    finalResult.value = outcome.payload
-    emit('complete', outcome.payload)
+  if (outcome) {
+    if (outcome.type === 'advance') {
+      emit('advance', outcome.nextNode)
+    } else {
+      finalResult.value = outcome.payload
+      emit('complete', outcome.payload)
+    }
   }
+  // 在下一个 microtask 释放锁，拦截同步连发的后续点击
+  queueMicrotask(() => {
+    isTransitioning.value = false
+  })
 }
 
 function handleBack() {
+  if (isTransitioning.value) return
   const node = state.goBack()
   if (node) emit('back', node)
 }
 
 function handleRestart() {
-  finished.value = false
   finalResult.value = null
   state.reset()
 }
@@ -64,15 +90,14 @@ function handleKeydown(event: KeyboardEvent, options: DecisionTreeOption[], inde
     nextIndex = (index + 1) % options.length
   } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
     nextIndex = (index - 1 + options.length) % options.length
-  } else if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    handleSelect(options[index])
-    return
   }
+  // F2: 删除 Enter/Space 分支，让原生 button click 处理激活（避免双触发）
   if (nextIndex !== null) {
+    // F11: 单选项节点 nextIndex === index 时早返，避免无意义 focus
+    if (nextIndex === index) return
     event.preventDefault()
     const parent = current.parentElement
-    const radios = parent?.querySelectorAll<HTMLElement>('[role="radio"]')
+    const radios = parent?.querySelectorAll<HTMLElement>('[role="button"]')
     radios?.[nextIndex]?.focus()
   }
 }
@@ -86,7 +111,7 @@ function handleKeydown(event: KeyboardEvent, options: DecisionTreeOption[], inde
     </div>
 
     <!-- 结果态 -->
-    <div v-else-if="finished && finalResult" class="dt-result">
+    <div v-else-if="isResultState && finalResult" class="dt-result">
       <div class="dt-result__icon">🎯</div>
       <div data-testid="dt-result" class="dt-result__text">
         推荐方案：{{ finalResult.result.planName }}
@@ -98,26 +123,31 @@ function handleKeydown(event: KeyboardEvent, options: DecisionTreeOption[], inde
 
     <!-- 问答态 -->
     <div v-else-if="state.currentNode.value" class="dt-question">
-      <h2 data-testid="dt-question" class="dt-question__title">
-        {{ state.currentNode.value.question }}
-      </h2>
+      <!-- F16: 挂载 <Transition> 让 fade-slide 生效，满足 AC #3 过渡动画 -->
+      <Transition name="fade-slide" mode="out-in">
+        <div :key="state.currentNode.value.id" class="dt-question__inner">
+          <h2 data-testid="dt-question" class="dt-question__title">
+            {{ state.currentNode.value.question }}
+          </h2>
 
-      <div class="dt-options" role="radiogroup" aria-label="决策选项">
-        <button
-          v-for="(opt, idx) in state.currentNode.value.options"
-          :key="opt.id"
-          :data-testid="`dt-option-${opt.id}`"
-          role="radio"
-          :aria-checked="false"
-          :aria-label="opt.label"
-          class="dt-option"
-          type="button"
-          @click="handleSelect(opt)"
-          @keydown="handleKeydown($event, state.currentNode.value!.options, idx)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
+          <div class="dt-options" role="list" aria-label="决策选项">
+            <button
+              v-for="(opt, idx) in currentOptions"
+              :key="opt.id"
+              :data-testid="`dt-option-${opt.id}`"
+              role="button"
+              :aria-pressed="false"
+              :aria-label="opt.label"
+              class="dt-option"
+              type="button"
+              @click="handleSelect(opt)"
+              @keydown="handleKeydown($event, currentOptions, idx)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+      </Transition>
 
       <div class="dt-footer">
         <el-button
@@ -163,6 +193,10 @@ function handleKeydown(event: KeyboardEvent, options: DecisionTreeOption[], inde
   font-size: 15px;
 }
 
+.dt-question__inner {
+  width: 100%;
+}
+
 .dt-question__title {
   margin: 0 0 24px;
   font-size: 22px;
@@ -193,6 +227,10 @@ function handleKeydown(event: KeyboardEvent, options: DecisionTreeOption[], inde
   text-align: left;
   transition: all 0.2s ease;
   font-family: inherit;
+  /* F14: 长 label 文本换行，避免 320px 极小屏溢出 */
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
 .dt-option:hover {
