@@ -1,3 +1,9 @@
+## Deferred from: code review of 3-4-步骤指南展示 (2026-06-09)
+
+- **测试覆盖不足（代码块、复制按钮）** [frontend/src/views/__tests__/StepGuideView.spec.ts] — 功能未实现，待 Story 3-5 补全后补充测试
+- **`vps-baota` 方案缺少 `externalUrl` 字段** [frontend/src/data/deployment-plans.ts] — 数据预存问题，非本变更引入
+- **空数组/undefined 的防御性渲染** [frontend/src/views/StepGuideView.vue] — 数据已有类型约束保障
+
 ## Deferred from: code review of 3-2-决策树数据设计 (2026-06-03)
 
 - **`depthOf`/`collectLeafDepths` 测试工具函数算法脆弱** [frontend/src/data/__tests__/decision-tree-data.spec.ts:9-30] — 每次递归 `new Set(visited)` 致环检测在工具函数内失效；测试内部辅助函数，且独立 dfs 用例已守护环检测不变量

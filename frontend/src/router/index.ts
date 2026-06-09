@@ -57,6 +57,15 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/DecisionResultView.vue'),
     meta: { requiresAuth: false },
   },
+  {
+    path: '/deployment/decision-tree/steps/:planId',
+    name: 'step-guide',
+    component: () => import('@/views/StepGuideView.vue'),
+    props: (route) => ({
+      planId: route.params.planId as string
+    }),
+    meta: { requiresAuth: false },
+  },
 ]
 
 const router = createRouter({
