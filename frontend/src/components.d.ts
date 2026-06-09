@@ -7,6 +7,8 @@ export {}
 
 declare module 'vue' {
   export interface GlobalComponents {
+    AIChat: typeof import('./components/AIChat.vue')['default']
+    AIChatButton: typeof import('./components/AIChatButton.vue')['default']
     CodeBlock: typeof import('./components/CodeBlock.vue')['default']
     ContentCard: typeof import('./components/ContentCard.vue')['default']
     DecisionTree: typeof import('./components/DecisionTree.vue')['default']

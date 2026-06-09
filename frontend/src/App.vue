@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import NavBar from '@/components/NavBar.vue'
+import AIChatButton from '@/components/AIChatButton.vue'
+import AIChat from '@/components/AIChat.vue'
 
 const userStore = useUserStore()
+const showAIChat = ref(false)
 
 onMounted(() => {
   userStore.fetchUserInfo()
@@ -16,6 +19,8 @@ onMounted(() => {
     <main class="main-content">
       <router-view />
     </main>
+    <AIChatButton @click="showAIChat = !showAIChat" />
+    <AIChat v-model:visible="showAIChat" />
   </div>
 </template>
 

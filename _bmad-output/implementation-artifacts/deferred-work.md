@@ -1,3 +1,7 @@
+## Deferred from: code review of 4-1-AIChat组件开发 (2026-06-09)
+
+- **消息区域使用原生 div 而非 el-scrollbar** [frontend/src/components/AIChat.vue:126] — Dev Notes 提到 el-scrollbar 虚拟滚动但实现使用原生 div，当前消息量下性能可接受，后续如有性能问题再升级
+
 ## Deferred from: code review of 3-4-步骤指南展示 (2026-06-09)
 
 - **测试覆盖不足（代码块、复制按钮）** [frontend/src/views/__tests__/StepGuideView.spec.ts] — 功能未实现，待 Story 3-5 补全后补充测试
