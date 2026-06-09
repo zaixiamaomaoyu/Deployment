@@ -174,3 +174,19 @@ CREATE TABLE `admin_audit_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员审计日志表';
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ============================================================
+-- 9. chat_logs AI 对话日志表
+-- ============================================================
+DROP TABLE IF EXISTS `chat_logs`;
+CREATE TABLE `chat_logs` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NOT NULL COMMENT '用户ID',
+  `role` ENUM('user', 'assistant') NOT NULL COMMENT '消息角色',
+  `content` TEXT NOT NULL COMMENT '消息内容',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_chat_log_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话日志表';

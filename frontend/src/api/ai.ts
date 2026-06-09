@@ -1,28 +1,61 @@
 /**
- * AI 对话 API（mock 实现）
+ * AI 对话 API（SSE 流式调用）
  *
- * Story 4-2 将替换为真实 SSE 流式调用
- * 接口签名使用 AsyncGenerator<string>，与后续 SSE 实现对齐
+ * 使用原生 fetch + ReadableStream 消费 SSE 流
+ * 接口签名保持 AsyncGenerator<string>，与 composable 对齐
  */
 
-/** mock 回复预设文案 */
-const MOCK_REPLIES: string[] = [
-  '这是 AI 助手的模拟回复。在后续版本中，这里将接入真实的 AI 服务，为您提供专业的部署问题解答。',
-  '您好！我目前处于演示模式，暂时无法回答真实的部署问题。正式版本上线后，我可以帮您解答部署相关的疑问，解释技术术语，并提供故障排查建议。',
-  '感谢您的提问！当前 AI 助手仍在开发中，此回复为模拟数据。敬请期待完整版本，届时我将为您提供全方位的部署学习支持。',
-]
-
 /**
- * 流式对话接口（mock）
+ * 流式对话接口
+ *
+ * 发送消息到后端 SSE 端点，逐 chunk 接收 AI 回复
  *
  * @param message - 用户消息内容
  * @yields 逐字输出的回复内容
+ * @throws 网络错误、401 未登录、429 限流、AI 服务错误
  */
 export async function* streamChat(message: string): AsyncGenerator<string> {
-  // 根据 message 长度选择不同回复，增加多样性
-  const reply = MOCK_REPLIES[message.length % MOCK_REPLIES.length]
-  for (const char of reply) {
-    yield char
-    await new Promise((resolve) => setTimeout(resolve, 30))
+  const response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // 携带 Session Cookie
+    body: JSON.stringify({ message }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('UNAUTHORIZED');
+    if (response.status === 429) throw new Error('RATE_LIMITED');
+    throw new Error('AI 服务暂时不可用');
+  }
+
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop()!; // 保留未完成的部分
+
+      for (const line of lines) {
+        const data = line.replace(/^data: /, '');
+        if (data === '[DONE]') return;
+
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.error) throw new Error(parsed.error);
+          if (parsed.content) yield parsed.content;
+        } catch (e) {
+          if (e instanceof SyntaxError) continue; // 忽略无法解析的行
+          throw e;
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
