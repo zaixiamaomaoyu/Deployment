@@ -1,8 +1,33 @@
-# Test Automation Summary — Story 2-6 收藏列表页
+# Test Automation Summary
 
-生成时间：2026-06-03
+生成时间：2026-06-09
 
 ## Generated Tests
+
+### Story 4-1 AIChat 对话组件
+
+#### 前端组件测试（Vitest + @vue/test-utils）
+
+- [x] `frontend/src/components/__tests__/AIChat.spec.ts` — 组件渲染 + 行为测试
+  - **10 用例**：面板渲染、输入框、关闭按钮、ARIA 属性、未登录提示、空状态、事件触发
+
+- [x] `frontend/src/composables/__tests__/useAIChat.spec.ts` — Composable 逻辑测试
+  - **10 用例**：初始状态、sendMessage 添加消息/流式回复/未登录、错误处理、clearMessages、retryLast
+
+#### E2E 测试（Playwright）
+
+- [x] `tests/e2e/ai-chat.spec.ts` — 浏览器端到端流程（route 拦截模拟 API）
+  - **8 用例**：
+    - AC #8 #1 点击悬浮按钮展开面板，显示对话界面
+    - AC #2 输入消息并发送，AI 流式回复逐字显示
+    - AC #8 再次点击悬浮按钮关闭面板
+    - AC #1 关闭按钮关闭面板
+    - AC #7 消息区域 ARIA 无障碍属性（role=log, aria-live=polite, aria-label）
+    - AC #1 清空对话按钮功能
+    - AC #4 未登录时显示登录提示和登录按钮
+    - AC #4 点击登录按钮跳转到登录页
+
+### Story 2-6 收藏列表页
 
 ### 后端 API 测试（Jest + Supertest）
 
