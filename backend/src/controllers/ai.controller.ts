@@ -96,7 +96,7 @@ export class AIController {
     // 6. 调用 AIService 流式输出
     let fullReply = '';
     try {
-      const stream = AIService.streamChat(cleanMessage, history);
+      const stream = AIService.streamChat(cleanMessage, history, abortController.signal);
 
       for await (const chunk of stream) {
         fullReply += chunk;

@@ -6,6 +6,8 @@ import { useAIChat } from '@/composables/useAIChat'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
 import { ElMessage } from 'element-plus'
 import { Close, CopyDocument, RefreshRight, Delete, VideoPause } from '@element-plus/icons-vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import type { ChatMessage } from '@/types/ai-chat'
 
 interface Props {
@@ -24,6 +26,8 @@ const { messages, status, sendMessage, clearMessages, retryLast, stopStreaming }
 
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLElement>()
+const textareaRef = ref<HTMLTextAreaElement>()
+const isInputFocused = ref(false)
 
 /** 是否正在流式输出 */
 const isStreaming = computed(() => status.value === 'streaming')
@@ -36,19 +40,54 @@ watch(
   messages,
   async () => {
     await nextTick()
-    if (messagesContainerRef.value) {
-      messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
-    }
+    scrollToBottom()
   },
   { deep: true }
 )
+
+/** 打开面板时滚动到底部 */
+watch(
+  () => props.visible,
+  async (newVal) => {
+    if (newVal) {
+      await nextTick()
+      scrollToBottom()
+    }
+  }
+)
+
+/** 滚动到消息容器底部 */
+function scrollToBottom() {
+  if (messagesContainerRef.value) {
+    messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
+  }
+}
 
 /** 发送消息 */
 async function handleSend() {
   const text = inputText.value.trim()
   if (!text || isStreaming.value) return
   inputText.value = ''
+  autoResize()
   await sendMessage(text)
+  nextTick(() => textareaRef.value?.focus())
+}
+
+/** 键盘事件：Enter 发送，Shift+Enter 换行 */
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    handleSend()
+  }
+}
+
+/** 自动调整 textarea 高度 */
+function autoResize() {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  const maxHeight = 120
+  el.style.height = Math.min(el.scrollHeight, maxHeight) + 'px'
 }
 
 /** 复制 AI 回复内容 */
@@ -94,6 +133,12 @@ function formatTime(timestamp: number): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+/** 将 Markdown 渲染为安全的 HTML */
+function renderMarkdown(content: string): string {
+  const rawHtml = marked.parse(content, { async: false }) as string
+  return DOMPurify.sanitize(rawHtml)
 }
 </script>
 
@@ -169,7 +214,11 @@ function formatTime(timestamp: number): string {
           </div>
           <div class="ac-message__body">
             <div class="ac-message__content">
-              <template v-if="msg.content">{{ msg.content }}</template>
+              <!-- 用户消息纯文本显示，AI 消息 Markdown 渲染 -->
+              <template v-if="msg.content">
+                <template v-if="msg.role === 'user'">{{ msg.content }}</template>
+                <div v-else v-html="renderMarkdown(msg.content)" />
+              </template>
               <!-- AI 回复未开始时显示打字动画 -->
               <span
                 v-else-if="msg.role === 'assistant' && isStreaming"
@@ -229,25 +278,34 @@ function formatTime(timestamp: number): string {
 
       <!-- 输入区域 -->
       <div v-else class="ac-input-area">
-        <el-input
-          v-model="inputText"
-          placeholder="有问题可以问我..."
-          data-testid="ac-input"
-          :disabled="isStreaming"
-          @keyup.enter="handleSend"
-        >
-          <template #append>
-            <el-button
-              type="primary"
-              data-testid="ac-send"
-              :disabled="!inputText.trim() || isStreaming"
-              aria-label="发送消息"
-              @click="handleSend"
-            >
-              发送
-            </el-button>
-          </template>
-        </el-input>
+        <div class="ac-input-wrapper" :class="{ 'ac-input-wrapper--focus': isInputFocused }">
+          <textarea
+            ref="textareaRef"
+            v-model="inputText"
+            class="ac-textarea"
+            placeholder="有问题可以问我..."
+            data-testid="ac-input"
+            :disabled="isStreaming"
+            rows="1"
+            @keydown="handleKeydown"
+            @focus="isInputFocused = true"
+            @blur="isInputFocused = false"
+            @input="autoResize"
+          />
+          <button
+            class="ac-send-btn"
+            data-testid="ac-send"
+            :disabled="!inputText.trim() || isStreaming"
+            aria-label="发送消息"
+            @click="handleSend"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </div>
+        <p class="ac-input-hint">Enter 发送 · Shift + Enter 换行</p>
       </div>
     </div>
   </transition>
@@ -389,6 +447,7 @@ function formatTime(timestamp: number): string {
 }
 
 .ac-message__body {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -400,6 +459,9 @@ function formatTime(timestamp: number): string {
   font-size: 14px;
   line-height: 1.6;
   word-break: break-word;
+  overflow-wrap: break-word; /* 确保长单词换行 */
+  max-width: 100%; /* 限制最大宽度 */
+  text-align: left;
 }
 
 .ac-message--user .ac-message__content {
@@ -412,6 +474,87 @@ function formatTime(timestamp: number): string {
   background: #f4f4f5;
   color: #303133;
   border-bottom-left-radius: 2px;
+}
+
+/* Markdown 渲染样式 */
+.ac-message--assistant .ac-message__content :deep(h1),
+.ac-message--assistant .ac-message__content :deep(h2),
+.ac-message--assistant .ac-message__content :deep(h3),
+.ac-message--assistant .ac-message__content :deep(h4) {
+  margin: 8px 0 4px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ac-message--assistant .ac-message__content :deep(h1) { font-size: 16px; }
+.ac-message--assistant .ac-message__content :deep(h2) { font-size: 15px; }
+.ac-message--assistant .ac-message__content :deep(h3),
+.ac-message--assistant .ac-message__content :deep(h4) { font-size: 14px; }
+
+.ac-message--assistant .ac-message__content :deep(p) {
+  margin: 4px 0;
+}
+
+.ac-message--assistant .ac-message__content :deep(ul),
+.ac-message--assistant .ac-message__content :deep(ol) {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.ac-message--assistant .ac-message__content :deep(li) {
+  margin: 2px 0;
+}
+
+.ac-message--assistant .ac-message__content :deep(code) {
+  background: #e4e4e7;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+.ac-message--assistant .ac-message__content :deep(pre) {
+  background: #27272a;
+  color: #f4f4f5;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.ac-message--assistant .ac-message__content :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.ac-message--assistant .ac-message__content :deep(blockquote) {
+  margin: 8px 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--primary-color, #409eff);
+  color: #606266;
+}
+
+.ac-message--assistant .ac-message__content :deep(a) {
+  color: var(--primary-color, #409eff);
+  text-decoration: underline;
+}
+
+.ac-message--assistant .ac-message__content :deep(table) {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+.ac-message--assistant .ac-message__content :deep(th),
+.ac-message--assistant .ac-message__content :deep(td) {
+  border: 1px solid #dcdfe6;
+  padding: 6px 10px;
+}
+
+.ac-message--assistant .ac-message__content :deep(th) {
+  background: #ebeef5;
+  font-weight: 600;
 }
 
 .ac-message__meta {
@@ -504,18 +647,90 @@ function formatTime(timestamp: number): string {
 
 /* 输入区域 */
 .ac-input-area {
-  padding: 12px 16px;
+  padding: 12px 16px 8px;
   border-top: 1px solid #ebeef5;
   background: #fff;
   flex-shrink: 0;
 }
 
-.ac-input-area :deep(.el-input-group__append) {
+.ac-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.ac-input-wrapper--focus {
+  border-color: var(--primary-color, #409eff);
+  box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.15);
+  background: #fff;
+}
+
+.ac-textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  max-height: 120px;
+  min-height: 22px;
+  padding: 2px 0;
+  color: #303133;
+  font-family: inherit;
+}
+
+.ac-textarea::placeholder {
+  color: #a8abb2;
+}
+
+.ac-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ac-send-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary-color, #409eff);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
   padding: 0;
 }
 
-.ac-input-area :deep(.el-input-group__append .el-button) {
-  border-radius: 0 4px 4px 0;
+.ac-send-btn:hover:not(:disabled) {
+  background: #66b1ff;
+  transform: scale(1.05);
+}
+
+.ac-send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.ac-send-btn:disabled {
+  background: #c0c4cc;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ac-input-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #c0c4cc;
+  text-align: center;
+  line-height: 1;
 }
 
 /* 移动端适配 */

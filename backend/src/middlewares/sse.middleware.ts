@@ -17,7 +17,7 @@ import { logger } from '../utils/logger';
 export function setSSEHeaders(res: Response): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
+    'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no', // Nginx 代理场景禁用缓冲
   });

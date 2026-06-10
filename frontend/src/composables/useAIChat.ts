@@ -48,12 +48,21 @@ export function useAIChat() {
     messages.value.push(aiMessage)
     status.value = 'streaming'
 
+    // 记录 AI 消息在数组中的索引，通过响应式 Proxy 修改才能触发 UI 更新
+    const aiMessageIndex = messages.value.length - 1
+
     // 创建 AbortController 用于中断
     abortController = new AbortController()
 
+    // 构建对话历史（最近 10 条，不包括当前消息）
+    const conversationHistory = messages.value
+      .filter((msg) => msg.id !== aiMessage.id) // 排除当前的 AI 占位消息
+      .slice(-10)
+      .map((msg) => ({ role: msg.role, content: msg.content }))
+
     try {
-      for await (const chunk of streamChat(content, abortController?.signal)) {
-        aiMessage.content += chunk
+      for await (const chunk of streamChat(content, abortController?.signal, conversationHistory)) {
+        messages.value[aiMessageIndex].content += chunk
       }
       status.value = 'idle'
     } catch (error) {
@@ -62,11 +71,11 @@ export function useAIChat() {
         (error instanceof DOMException && error.name === 'AbortError') ||
         (error instanceof Error && error.name === 'AbortError')
       ) {
-        aiMessage.aborted = true
+        messages.value[aiMessageIndex].aborted = true
         status.value = 'idle'
       } else {
-        aiMessage.error = true
-        aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
+        messages.value[aiMessageIndex].error = true
+        messages.value[aiMessageIndex].content = error instanceof Error ? error.message : 'AI 助手暂时不可用，请稍后再试'
         status.value = 'error'
       }
     } finally {
@@ -121,12 +130,21 @@ export function useAIChat() {
     messages.value.push(aiMessage)
     status.value = 'streaming'
 
+    // 记录 AI 消息在数组中的索引，通过响应式 Proxy 修改才能触发 UI 更新
+    const aiMessageIndex = messages.value.length - 1
+
     // 创建 AbortController 用于中断
     abortController = new AbortController()
 
+    // 构建对话历史（最近 10 条，不包括当前消息）
+    const conversationHistory = messages.value
+      .filter((msg) => msg.id !== aiMessage.id) // 排除当前的 AI 占位消息
+      .slice(-10)
+      .map((msg) => ({ role: msg.role, content: msg.content }))
+
     try {
-      for await (const chunk of streamChat(lastUserMsg.content, abortController?.signal)) {
-        aiMessage.content += chunk
+      for await (const chunk of streamChat(lastUserMsg.content, abortController?.signal, conversationHistory)) {
+        messages.value[aiMessageIndex].content += chunk
       }
       status.value = 'idle'
     } catch (error) {
@@ -135,11 +153,11 @@ export function useAIChat() {
         (error instanceof DOMException && error.name === 'AbortError') ||
         (error instanceof Error && error.name === 'AbortError')
       ) {
-        aiMessage.aborted = true
+        messages.value[aiMessageIndex].aborted = true
         status.value = 'idle'
       } else {
-        aiMessage.error = true
-        aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
+        messages.value[aiMessageIndex].error = true
+        messages.value[aiMessageIndex].content = error instanceof Error ? error.message : 'AI 助手暂时不可用，请稍后再试'
         status.value = 'error'
       }
     } finally {

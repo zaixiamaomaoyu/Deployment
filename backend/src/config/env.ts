@@ -9,8 +9,16 @@ export const env = cleanEnv(process.env, {
   DB_USER: str(),
   DB_PASSWORD: str(),
 
+  // AI Provider（'claude' | 'kimi' | 'openai' | 'mock'）
+  AI_PROVIDER: str({ default: 'mock' }),
+
+  // OpenAI 兼容 API（智谱 GLM / Kimi / OpenAI）
+  KIMI_API_KEY: str({ default: '' }),
+  KIMI_API_URL: url({ default: 'https://open.bigmodel.cn/api/paas/v4' }),
+  KIMI_MODEL: str({ default: 'glm-4-flash' }),
+
   // Claude API
-  CLAUDE_API_KEY: str(),
+  CLAUDE_API_KEY: str({ default: '' }),
   CLAUDE_API_URL: url({ default: 'https://api.anthropic.com/v1/messages' }),
 
   // Server

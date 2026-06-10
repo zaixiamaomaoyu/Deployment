@@ -12,18 +12,20 @@
  *
  * @param message - 用户消息内容
  * @param signal - AbortSignal 用于中断请求
+ * @param conversationHistory - 对话历史（最近 N 条）
  * @yields 逐字输出的回复内容
  * @throws 网络错误、401 未登录、429 限流、AI 服务错误
  */
 export async function* streamChat(
   message: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  conversationHistory?: Array<{ role: string; content: string }>
 ): AsyncGenerator<string> {
   const response = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include', // 携带 Session Cookie
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, conversationHistory }),
     signal, // 支持中断
   });
 

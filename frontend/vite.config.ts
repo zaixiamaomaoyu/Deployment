@@ -24,4 +24,18 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        // SSE 流式响应需要禁用代理缓冲
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, _req, _res) => {
+            proxyReq.setHeader('X-Accel-Buffering', 'no');
+          });
+        },
+      },
+    },
+  },
 })
