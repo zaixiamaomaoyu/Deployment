@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { useAIChat } from '@/composables/useAIChat'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
 import { ElMessage } from 'element-plus'
-import { Close, CopyDocument, RefreshRight, Delete } from '@element-plus/icons-vue'
+import { Close, CopyDocument, RefreshRight, Delete, VideoPause } from '@element-plus/icons-vue'
 import type { ChatMessage } from '@/types/ai-chat'
 
 interface Props {
@@ -20,7 +20,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const userStore = useUserStore()
-const { messages, status, sendMessage, clearMessages, retryLast } = useAIChat()
+const { messages, status, sendMessage, clearMessages, retryLast, stopStreaming } = useAIChat()
 
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLElement>()
@@ -71,6 +71,11 @@ function handleClear() {
   clearMessages()
 }
 
+/** 停止生成 */
+function handleStop() {
+  stopStreaming()
+}
+
 /** 关闭面板 */
 function handleClose() {
   emit('update:visible', false)
@@ -102,6 +107,16 @@ function formatTime(timestamp: number): string {
           <span>AI 学习助手</span>
         </div>
         <div class="ac-header__actions">
+          <el-button
+            v-if="isStreaming"
+            :icon="VideoPause"
+            circle
+            size="small"
+            data-testid="ac-stop"
+            aria-label="停止生成"
+            type="danger"
+            @click="handleStop"
+          />
           <el-button
             v-if="hasMessages"
             :icon="Delete"
@@ -170,6 +185,11 @@ function formatTime(timestamp: number): string {
                 class="ac-cursor"
                 aria-hidden="true"
               >▊</span>
+              <!-- 中断标记 -->
+              <span
+                v-if="msg.aborted"
+                class="ac-aborted"
+              >（已中断）</span>
             </div>
             <div class="ac-message__meta">
               <span class="ac-message__time">{{ formatTime(msg.timestamp) }}</span>
@@ -430,6 +450,13 @@ function formatTime(timestamp: number): string {
 @keyframes cursor-blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
+}
+
+/* 中断标记 */
+.ac-aborted {
+  color: #909399;
+  font-size: 12px;
+  font-style: italic;
 }
 
 /* 打字动画（三点） */

@@ -13,6 +13,7 @@ export function useAIChat() {
   const userStore = useUserStore()
   const messages = ref<ChatMessage[]>([])
   const status = ref<AIChatStatus>('idle')
+  let abortController: AbortController | null = null // 用于中断 SSE 流
 
   /** 生成唯一消息 ID */
   function generateId(): string {
@@ -47,22 +48,53 @@ export function useAIChat() {
     messages.value.push(aiMessage)
     status.value = 'streaming'
 
+    // 创建 AbortController 用于中断
+    abortController = new AbortController()
+
     try {
-      for await (const chunk of streamChat(content)) {
+      for await (const chunk of streamChat(content, abortController?.signal)) {
         aiMessage.content += chunk
       }
       status.value = 'idle'
     } catch (error) {
-      aiMessage.error = true
-      aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
-      status.value = 'error'
+      // 统一在 catch 中处理中断和错误
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
+        aiMessage.aborted = true
+        status.value = 'idle'
+      } else {
+        aiMessage.error = true
+        aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
+        status.value = 'error'
+      }
+    } finally {
+      abortController = null
     }
   }
 
   /** 清空对话历史 */
   function clearMessages() {
+    // 先中断流式输出，避免访问已清空的消息数组
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
     messages.value = []
     status.value = 'idle'
+  }
+
+  /**
+   * 停止当前流式输出
+   *
+   * 调用 AbortController 中断 SSE 流
+   */
+  function stopStreaming() {
+    if (abortController && status.value === 'streaming') {
+      abortController.abort()
+      // 注意：状态更新在 sendMessage 的 catch 中处理
+    }
   }
 
   /** 重试上一条失败的消息（不追加重复用户消息） */
@@ -89,17 +121,31 @@ export function useAIChat() {
     messages.value.push(aiMessage)
     status.value = 'streaming'
 
+    // 创建 AbortController 用于中断
+    abortController = new AbortController()
+
     try {
-      for await (const chunk of streamChat(lastUserMsg.content)) {
+      for await (const chunk of streamChat(lastUserMsg.content, abortController?.signal)) {
         aiMessage.content += chunk
       }
       status.value = 'idle'
     } catch (error) {
-      aiMessage.error = true
-      aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
-      status.value = 'error'
+      // 统一在 catch 中处理中断和错误
+      if (
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (error instanceof Error && error.name === 'AbortError')
+      ) {
+        aiMessage.aborted = true
+        status.value = 'idle'
+      } else {
+        aiMessage.error = true
+        aiMessage.content = 'AI 助手暂时不可用，请稍后再试'
+        status.value = 'error'
+      }
+    } finally {
+      abortController = null
     }
   }
 
-  return { messages, status, sendMessage, clearMessages, retryLast }
+  return { messages, status, sendMessage, clearMessages, retryLast, stopStreaming }
 }

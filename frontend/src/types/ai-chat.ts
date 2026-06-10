@@ -8,6 +8,7 @@ export interface ChatMessage {
   content: string
   timestamp: number
   error?: boolean
+  aborted?: boolean // 标记消息是否被中断
 }
 
 /** AIChat 组件状态 */

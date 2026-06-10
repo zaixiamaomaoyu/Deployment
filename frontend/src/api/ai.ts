@@ -11,15 +11,20 @@
  * 发送消息到后端 SSE 端点，逐 chunk 接收 AI 回复
  *
  * @param message - 用户消息内容
+ * @param signal - AbortSignal 用于中断请求
  * @yields 逐字输出的回复内容
  * @throws 网络错误、401 未登录、429 限流、AI 服务错误
  */
-export async function* streamChat(message: string): AsyncGenerator<string> {
+export async function* streamChat(
+  message: string,
+  signal?: AbortSignal
+): AsyncGenerator<string> {
   const response = await fetch('/api/ai/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include', // 携带 Session Cookie
     body: JSON.stringify({ message }),
+    signal, // 支持中断
   });
 
   if (!response.ok) {

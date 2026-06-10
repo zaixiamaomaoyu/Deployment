@@ -35,7 +35,7 @@
 # - 开发者将 Story 移至 '代码审查'，然后运行代码审查流程
 
 生成时间: 2026-03-31
-最后更新: 2026-06-09 (Story 4-2 AI对话后端API 开发完成)
+最后更新: 2026-06-09 (Story 4-3 流式响应处理 开发完成)
 项目名称: Deployment
 项目标识: NOKEY
 追踪系统: file-system
@@ -82,7 +82,7 @@ Story位置: _bmad-output/implementation-artifacts/stories
   epic-4: 进行中
   4-1-AIChat组件开发: 已完成
   4-2-AI对话后端API: 已完成
-  4-3-流式响应处理: 待开发
+  4-3-流式响应处理: 已完成
   4-4-术语解释功能: 待开发
   4-5-对话历史记录: 待开发
   epic-4-回顾: 可选
