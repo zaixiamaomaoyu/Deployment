@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import type { DecisionTreeCompletePayload } from '@/types/decision-tree'
 import { deploymentPlans } from '@/data/deployment-plans'
 
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   (e: 'go-back'): void
   (e: 'view-steps'): void
 }>()
+
+const router = useRouter()
 
 // 从 deploymentPlans 读取方案详情，不存在时显示空状态
 const plan = computed(() => deploymentPlans[props.result.result.planId])
@@ -32,6 +35,10 @@ function handleGoBack() {
 
 function handleViewSteps() {
   emit('view-steps')
+  // 跳转到步骤指南页面
+  if (plan.value) {
+    router.push(`/deployment/decision-tree/steps/${plan.value.planId}`)
+  }
 }
 
 function priceRangeLabel(range: 'free' | 'low' | 'medium' | 'high'): string {

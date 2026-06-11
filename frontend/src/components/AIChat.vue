@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { useAIChat } from '@/composables/useAIChat'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
 import { ElMessage } from 'element-plus'
-import { Close, CopyDocument, RefreshRight, Delete, VideoPause, ArrowLeft, Loading } from '@element-plus/icons-vue'
+import { Close, CopyDocument, RefreshRight, Delete, VideoPause, ArrowLeft, Loading, Bottom } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -29,6 +29,7 @@ const messagesContainerRef = ref<HTMLElement>()
 const textareaRef = ref<HTMLTextAreaElement>()
 const isInputFocused = ref(false)
 const isSending = ref(false)
+const showScrollToBottom = ref(false) // 是否显示滚动到底部按钮
 
 /** 是否正在流式输出 */
 const isStreaming = computed(() => status.value === 'streaming')
@@ -81,10 +82,27 @@ onUnmounted(() => {
   messageContainerEl?.removeEventListener('click', handleContentClick)
 })
 
-/** 滚动到消息容器底部 */
+/** 滚动到消息容器底部（平滑滚动） */
 function scrollToBottom() {
   if (messagesContainerRef.value) {
-    messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
+    // 测试环境（jsdom）不支持 scrollTo，使用 scrollTop 回退
+    if (typeof messagesContainerRef.value.scrollTo === 'function') {
+      messagesContainerRef.value.scrollTo({
+        top: messagesContainerRef.value.scrollHeight,
+        behavior: 'smooth'
+      })
+    } else {
+      messagesContainerRef.value.scrollTop = messagesContainerRef.value.scrollHeight
+    }
+  }
+}
+
+/** 处理消息区域滚动事件 */
+function handleMessagesScroll() {
+  if (messagesContainerRef.value) {
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.value
+    // 当滚动距离底部超过视口高度的一半时显示按钮
+    showScrollToBottom.value = scrollHeight - scrollTop - clientHeight > clientHeight / 2
   }
 }
 
@@ -287,6 +305,7 @@ function handleContentClick(event: MouseEvent) {
         aria-live="polite"
         aria-label="AI 助手对话"
         data-testid="ac-messages"
+        @scroll="handleMessagesScroll"
       >
         <!-- 历史加载状态 -->
         <div v-if="isLoadingHistory" class="ac-history-loading" data-testid="ac-history-loading">
@@ -398,8 +417,20 @@ function handleContentClick(event: MouseEvent) {
             </div>
           </div>
         </div>
-
       </div>
+
+      <!-- 滚动到底部按钮（浮动在消息区域上方） -->
+      <transition name="fade">
+        <button
+          v-if="showScrollToBottom && messages.length > 0"
+          class="ac-scroll-to-bottom"
+          data-testid="ac-scroll-to-bottom"
+          aria-label="滚动到底部"
+          @click="scrollToBottom"
+        >
+          <el-icon :size="16"><Bottom /></el-icon>
+        </button>
+      </transition>
 
       <!-- 未登录提示 -->
       <div v-if="!userStore.isLoggedIn" class="ac-login-hint" data-testid="ac-login-hint">
@@ -529,6 +560,7 @@ function handleContentClick(event: MouseEvent) {
   flex-direction: column;
   gap: 12px;
   min-height: 300px;
+  position: relative; /* 为滚动到底部按钮提供定位上下文 */
 }
 
 /* 历史加载状态 */
@@ -549,6 +581,49 @@ function handleContentClick(event: MouseEvent) {
 @keyframes rotating {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 滚动到底部按钮 */
+.ac-scroll-to-bottom {
+  position: absolute;
+  bottom: 80px; /* 输入区域上方 */
+  right: 24px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 202; /* 高于面板的 z-index: 201 */
+  color: #606266;
+}
+
+.ac-scroll-to-bottom:hover {
+  background: var(--primary-color, #409eff);
+  color: #fff;
+  border-color: var(--primary-color, #409eff);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.ac-scroll-to-bottom:active {
+  transform: translateY(0);
+}
+
+/* 淡入淡出过渡 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
 /* 空状态 */
