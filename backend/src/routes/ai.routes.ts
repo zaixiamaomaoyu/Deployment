@@ -22,4 +22,10 @@ const aiLimiter = rateLimit({
 // POST /ai/chat - AI 对话（SSE 流式响应）
 router.post('/ai/chat', aiLimiter, AIController.chat);
 
+// GET /ai/history - 获取对话历史（不加 aiLimiter，非 AI 生成调用）
+router.get('/ai/history', AIController.getHistory);
+
+// DELETE /ai/history - 清空对话历史（不加 aiLimiter，非 AI 生成调用）
+router.delete('/ai/history', AIController.clearHistory);
+
 export default router;

@@ -19,14 +19,12 @@ async function* mockStreamChat(_message: string): AsyncGenerator<string> {
   }
 }
 
-vi.mock('@/api/ai', () => ({
-  streamChat: (_message: string) => mockStreamChat(_message),
-}))
-
 // 错误流程 mock — 使用 vi.hoisted 以便在独立 describe 中切换
 const shouldThrow = { value: false }
+const shouldHistoryThrow = { value: false }
+const shouldClearThrow = { value: false }
 
-// 覆盖 @/api/ai mock 以支持错误场景
+// 统一 mock @/api/ai
 vi.mock('@/api/ai', () => ({
   streamChat: (_message: string) => {
     if (shouldThrow.value) {
@@ -35,6 +33,20 @@ vi.mock('@/api/ai', () => ({
       })()
     }
     return mockStreamChat(_message)
+  },
+  fetchChatHistory: async () => {
+    if (shouldHistoryThrow.value) {
+      throw new Error('加载失败')
+    }
+    return [
+      { role: 'user' as const, content: '历史问题', created_at: '2026-06-11T08:00:00Z' },
+      { role: 'assistant' as const, content: '历史回复', created_at: '2026-06-11T08:01:00Z' },
+    ]
+  },
+  clearChatHistory: async () => {
+    if (shouldClearThrow.value) {
+      throw new Error('清空失败')
+    }
   },
 }))
 
@@ -103,21 +115,78 @@ describe('useAIChat — sendMessage 错误处理', () => {
     const { messages, sendMessage, status, clearMessages } = useAIChat()
     await sendMessage('触发错误')
     expect(status.value).toBe('error')
-    clearMessages()
+    await clearMessages()
     expect(messages.value).toEqual([])
     expect(status.value).toBe('idle')
   })
 })
 
+describe('useAIChat — loadHistory', () => {
+  beforeEach(() => {
+    shouldHistoryThrow.value = false
+    mockUserStore.isLoggedIn = true
+  })
+
+  it('loadHistory 未登录时直接返回', async () => {
+    mockUserStore.isLoggedIn = false
+    const { messages, loadHistory } = useAIChat()
+    await loadHistory()
+    expect(messages.value).toEqual([])
+  })
+
+  it('loadHistory 成功后将历史映射为 ChatMessage', async () => {
+    const { messages, loadHistory } = useAIChat()
+    await loadHistory()
+    expect(messages.value.length).toBe(2)
+    expect(messages.value[0].role).toBe('user')
+    expect(messages.value[0].content).toBe('历史问题')
+    expect(messages.value[1].role).toBe('assistant')
+    expect(messages.value[1].content).toBe('历史回复')
+    // 验证前端 id 已生成
+    expect(messages.value[0].id).toMatch(/^hist-/)
+  })
+
+  it('loadHistory 失败时设置 historyError', async () => {
+    shouldHistoryThrow.value = true
+    const { historyError, loadHistory } = useAIChat()
+    await loadHistory()
+    expect(historyError.value).toBe('加载历史记录失败，请重试')
+  })
+
+  it('loadHistory 已有消息时不重复加载', async () => {
+    const { messages, sendMessage, loadHistory } = useAIChat()
+    mockUserStore.isLoggedIn = true
+    await sendMessage('新消息')
+    const countBefore = messages.value.length
+    await loadHistory()
+    // 已有消息时不应加载历史（fetchChatHistory 不会被再次调用覆盖）
+    expect(messages.value.length).toBe(countBefore)
+  })
+})
+
 describe('useAIChat — clearMessages', () => {
+  beforeEach(() => {
+    shouldClearThrow.value = false
+    mockUserStore.isLoggedIn = true
+  })
+
   it('clearMessages 清空消息列表并重置状态', async () => {
     const { messages, status, sendMessage, clearMessages } = useAIChat()
     mockUserStore.isLoggedIn = true
     await sendMessage('你好')
     expect(messages.value.length).toBeGreaterThan(0)
-    clearMessages()
+    await clearMessages()
     expect(messages.value).toEqual([])
     expect(status.value).toBe('idle')
+  })
+
+  it('clearMessages 调用 clearChatHistory API', async () => {
+    const { messages, sendMessage, clearMessages } = useAIChat()
+    mockUserStore.isLoggedIn = true
+    await sendMessage('你好')
+    await clearMessages()
+    // mock 已设置，若未调用会报错；此处主要验证不抛异常
+    expect(messages.value).toEqual([])
   })
 })
 

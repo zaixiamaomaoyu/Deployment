@@ -12,9 +12,13 @@ const mockState = vi.hoisted(() => ({
   },
   messages: [] as ChatMessage[],
   status: 'idle' as AIChatStatus,
+  isLoadingHistory: false,
+  historyError: null as string | null,
   sendMessage: vi.fn(),
   clearMessages: vi.fn(),
   retryLast: vi.fn(),
+  loadHistory: vi.fn(),
+  stopStreaming: vi.fn(),
 }))
 
 vi.mock('@/stores/user', () => ({
@@ -25,9 +29,13 @@ vi.mock('@/composables/useAIChat', () => ({
   useAIChat: () => ({
     messages: ref(mockState.messages),
     status: ref(mockState.status),
+    isLoadingHistory: ref(mockState.isLoadingHistory),
+    historyError: ref(mockState.historyError),
     sendMessage: mockState.sendMessage,
     clearMessages: mockState.clearMessages,
     retryLast: mockState.retryLast,
+    loadHistory: mockState.loadHistory,
+    stopStreaming: mockState.stopStreaming,
   }),
 }))
 
@@ -41,6 +49,24 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
+vi.mock('element-plus', async () => {
+  const actual = await vi.importActual('element-plus')
+  return {
+    ...actual,
+    ElMessageBox: {
+      confirm: vi.fn().mockResolvedValue(undefined),
+    },
+    ElMessage: {
+      success: vi.fn(),
+      error: vi.fn(),
+    },
+  }
+})
+
+function flushPromises() {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 function mountAIChat(visible = true) {
   return mount(AIChat, {
     props: { visible },
@@ -49,6 +75,8 @@ function mountAIChat(visible = true) {
         ElButton: true,
         ElInput: true,
         ElTag: true,
+        ElIcon: true,
+        ElAlert: true,
       },
     },
   })
@@ -133,6 +161,62 @@ describe('AIChat — 消息展示', () => {
   })
 })
 
+describe('AIChat — 历史加载与清空', () => {
+  beforeEach(() => {
+    mockState.messages = []
+    mockState.status = 'idle'
+    mockState.isLoadingHistory = false
+    mockState.historyError = null
+    mockState.userStore.isLoggedIn = true
+    mockState.loadHistory.mockClear()
+    mockState.clearMessages.mockClear()
+  })
+
+  it('打开面板且消息为空时触发 loadHistory', async () => {
+    const wrapper = mountAIChat(false)
+    await nextTick()
+    expect(mockState.loadHistory).not.toHaveBeenCalled()
+    await wrapper.setProps({ visible: true })
+    await nextTick()
+    await flushPromises()
+    expect(mockState.loadHistory).toHaveBeenCalled()
+  })
+
+  it('加载状态时显示旋转指示器', async () => {
+    mockState.isLoadingHistory = true
+    const wrapper = mountAIChat(true)
+    await nextTick()
+    expect(wrapper.find('[data-testid="ac-history-loading"]').exists()).toBe(true)
+  })
+
+  it('加载错误时显示错误提示和重试按钮', async () => {
+    mockState.historyError = '加载历史记录失败，请重试'
+    const wrapper = mountAIChat(true)
+    await nextTick()
+    expect(wrapper.find('[data-testid="ac-history-error"]').exists()).toBe(true)
+  })
+
+  it('有消息且已登录时显示清空按钮', async () => {
+    mockState.messages = [
+      { id: 'msg-1', role: 'user' as const, content: 'test', timestamp: Date.now() },
+    ]
+    mockState.userStore.isLoggedIn = true
+    const wrapper = mountAIChat(true)
+    await nextTick()
+    expect(wrapper.find('[data-testid="ac-clear"]').exists()).toBe(true)
+  })
+
+  it('未登录时不显示清空按钮', async () => {
+    mockState.messages = [
+      { id: 'msg-1', role: 'user' as const, content: 'test', timestamp: Date.now() },
+    ]
+    mockState.userStore.isLoggedIn = false
+    const wrapper = mountAIChat(true)
+    await nextTick()
+    expect(wrapper.find('[data-testid="ac-clear"]').exists()).toBe(false)
+  })
+})
+
 describe('AIChat — 事件', () => {
   beforeEach(() => {
     mockState.messages = []
@@ -160,6 +244,7 @@ describe('AIChat — 事件', () => {
     const clearBtn = wrapper.find('[data-testid="ac-clear"]')
     expect(clearBtn.exists()).toBe(true)
     await clearBtn.trigger('click')
+    await flushPromises()
     expect(mockState.clearMessages).toHaveBeenCalled()
   })
 

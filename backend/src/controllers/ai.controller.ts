@@ -20,6 +20,7 @@ interface ChatMessage {
  * AI 对话控制器
  *
  * 处理 AI 对话请求，返回 SSE 流式响应
+ * 处理对话历史查询与清空
  */
 export class AIController {
   /**
@@ -120,6 +121,61 @@ export class AIController {
       }
 
       sendSSEEnd(res);
+    }
+  }
+
+  /**
+   * 获取对话历史
+   *
+   * GET /api/ai/history
+   *
+   * 返回当前用户最近 50 条对话记录
+   */
+  static async getHistory(req: Request, res: Response): Promise<void> {
+    const userId = req.session?.userId;
+    if (!userId) {
+      res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: '请先登录',
+      });
+      return;
+    }
+
+    try {
+      const messages = await ChatLogsModel.findByUserId(userId, 50);
+      res.json({
+        code: 'SUCCESS',
+        data: { messages },
+      });
+    } catch (error) {
+      logger.error('获取对话历史失败:', error);
+      res.status(500).json({ code: 'INTERNAL_ERROR', message: '获取对话历史失败' });
+    }
+  }
+
+  /**
+   * 清空对话历史
+   *
+   * DELETE /api/ai/history
+   *
+   * 删除当前用户的所有对话记录
+   */
+  static async clearHistory(req: Request, res: Response): Promise<void> {
+    const userId = req.session?.userId;
+    if (!userId) {
+      res.status(401).json({
+        code: 'UNAUTHORIZED',
+        message: '请先登录',
+      });
+      return;
+    }
+
+    try {
+      await ChatLogsModel.deleteByUserId(userId);
+      res.json({ code: 'SUCCESS', message: '对话历史已清空' });
+    } catch (error) {
+      logger.error('清空对话历史失败:', error);
+      res.status(500).json({ code: 'INTERNAL_ERROR', message: '清空对话历史失败' });
     }
   }
 }

@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { streamChat } from '@/api/ai'
+import { streamChat, fetchChatHistory, clearChatHistory } from '@/api/ai'
+import { ElMessage } from 'element-plus'
 import type { ChatMessage, AIChatStatus } from '@/types/ai-chat'
 
 /**
@@ -13,11 +14,42 @@ export function useAIChat() {
   const userStore = useUserStore()
   const messages = ref<ChatMessage[]>([])
   const status = ref<AIChatStatus>('idle')
+  const isLoadingHistory = ref(false)
+  const historyError = ref<string | null>(null)
   let abortController: AbortController | null = null // 用于中断 SSE 流
 
   /** 生成唯一消息 ID */
   function generateId(): string {
     return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+  }
+
+  /**
+   * 加载对话历史
+   *
+   * 从后端获取最近 50 条记录，映射为前端 ChatMessage 格式
+   * 仅在未登录或消息数组为空时执行
+   */
+  async function loadHistory() {
+    if (!userStore.isLoggedIn) return
+    if (messages.value.length > 0) return // 避免重复加载
+
+    isLoadingHistory.value = true
+    historyError.value = null
+
+    try {
+      const history = await fetchChatHistory()
+      messages.value = history.map((item, index) => ({
+        id: `hist-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+        role: item.role,
+        content: item.content,
+        timestamp: new Date(item.created_at).getTime(),
+      }))
+    } catch (error) {
+      historyError.value = '加载历史记录失败，请重试'
+      console.error('加载对话历史失败:', error)
+    } finally {
+      isLoadingHistory.value = false
+    }
   }
 
   /**
@@ -56,7 +88,7 @@ export function useAIChat() {
 
     // 构建对话历史（最近 10 条，不包括当前消息）
     const conversationHistory = messages.value
-      .filter((msg) => msg.id !== aiMessage.id) // 排除当前的 AI 占位消息
+      .filter((msg) => msg.id !== aiMessage.id && msg.content.trim().length > 0) // 排除当前的 AI 占位消息和空消息
       .slice(-10)
       .map((msg) => ({ role: msg.role, content: msg.content }))
 
@@ -83,13 +115,22 @@ export function useAIChat() {
     }
   }
 
-  /** 清空对话历史 */
-  function clearMessages() {
+  /** 清空对话历史（异步：先删除后端记录，再清空前端状态） */
+  async function clearMessages() {
     // 先中断流式输出，避免访问已清空的消息数组
     if (abortController) {
       abortController.abort()
       abortController = null
     }
+
+    try {
+      if (userStore.isLoggedIn) {
+        await clearChatHistory()
+      }
+    } catch (error) {
+      ElMessage.error('清空历史记录失败')
+    }
+
     messages.value = []
     status.value = 'idle'
   }
@@ -138,7 +179,7 @@ export function useAIChat() {
 
     // 构建对话历史（最近 10 条，不包括当前消息）
     const conversationHistory = messages.value
-      .filter((msg) => msg.id !== aiMessage.id) // 排除当前的 AI 占位消息
+      .filter((msg) => msg.id !== aiMessage.id && msg.content.trim().length > 0) // 排除当前的 AI 占位消息和空消息
       .slice(-10)
       .map((msg) => ({ role: msg.role, content: msg.content }))
 
@@ -165,5 +206,15 @@ export function useAIChat() {
     }
   }
 
-  return { messages, status, sendMessage, clearMessages, retryLast, stopStreaming }
+  return {
+    messages,
+    status,
+    isLoadingHistory,
+    historyError,
+    sendMessage,
+    clearMessages,
+    retryLast,
+    stopStreaming,
+    loadHistory,
+  }
 }

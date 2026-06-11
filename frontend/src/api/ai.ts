@@ -1,9 +1,50 @@
+import type { ChatRole } from '@/types/ai-chat'
+
 /**
  * AI 对话 API（SSE 流式调用）
  *
  * 使用原生 fetch + ReadableStream 消费 SSE 流
  * 接口签名保持 AsyncGenerator<string>，与 composable 对齐
  */
+
+/**
+ * 获取对话历史
+ *
+ * 调用后端 GET /api/ai/history，返回最近 50 条记录
+ */
+export async function fetchChatHistory(): Promise<
+  Array<{ role: ChatRole; content: string; created_at: string }>
+> {
+  const response = await fetch('/api/ai/history', {
+    method: 'GET',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('UNAUTHORIZED')
+    throw new Error('加载历史记录失败')
+  }
+
+  const result = await response.json()
+  return result.data.messages
+}
+
+/**
+ * 清空对话历史
+ *
+ * 调用后端 DELETE /api/ai/history
+ */
+export async function clearChatHistory(): Promise<void> {
+  const response = await fetch('/api/ai/history', {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('UNAUTHORIZED')
+    throw new Error('清空历史记录失败')
+  }
+}
 
 /**
  * 流式对话接口

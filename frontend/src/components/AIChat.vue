@@ -5,7 +5,8 @@ import { useUserStore } from '@/stores/user'
 import { useAIChat } from '@/composables/useAIChat'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
 import { ElMessage } from 'element-plus'
-import { Close, CopyDocument, RefreshRight, Delete, VideoPause, ArrowLeft } from '@element-plus/icons-vue'
+import { Close, CopyDocument, RefreshRight, Delete, VideoPause, ArrowLeft, Loading } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
@@ -21,7 +22,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const userStore = useUserStore()
-const { messages, status, sendMessage, clearMessages, retryLast, stopStreaming } = useAIChat()
+const { messages, status, isLoadingHistory, historyError, sendMessage, clearMessages, retryLast, stopStreaming, loadHistory } = useAIChat()
 
 const inputText = ref('')
 const messagesContainerRef = ref<HTMLElement>()
@@ -55,13 +56,17 @@ watch(
   { deep: true }
 )
 
-/** 打开面板时滚动到底部 */
+/** 打开面板时滚动到底部，并在首次打开时加载历史 */
 watch(
   () => props.visible,
   async (newVal) => {
     if (newVal) {
       await nextTick()
       scrollToBottom()
+      // 仅在无消息时加载历史，避免覆盖当前对话
+      if (messages.value.length === 0) {
+        loadHistory()
+      }
     }
   }
 )
@@ -132,9 +137,23 @@ async function handleRetry() {
   await retryLast()
 }
 
-/** 清空对话 */
-function handleClear() {
-  clearMessages()
+/** 清空对话（带确认对话框） */
+async function handleClear() {
+  try {
+    await ElMessageBox.confirm(
+      '确定要清空所有对话历史吗？此操作不可恢复',
+      '清空对话',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    await clearMessages()
+    ElMessage.success('对话历史已清空')
+  } catch {
+    // 用户取消，不做任何事
+  }
 }
 
 /** 停止生成 */
@@ -234,7 +253,7 @@ function handleContentClick(event: MouseEvent) {
             @click="handleStop"
           />
           <el-button
-            v-if="hasMessages"
+            v-if="hasMessages && userStore.isLoggedIn"
             :icon="Delete"
             circle
             size="small"
@@ -262,6 +281,26 @@ function handleContentClick(event: MouseEvent) {
         aria-label="AI 助手对话"
         data-testid="ac-messages"
       >
+        <!-- 历史加载状态 -->
+        <div v-if="isLoadingHistory" class="ac-history-loading" data-testid="ac-history-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>正在加载历史记录...</span>
+        </div>
+
+        <!-- 历史加载错误 -->
+        <el-alert
+          v-if="historyError"
+          :title="historyError"
+          type="error"
+          :closable="false"
+          show-icon
+          data-testid="ac-history-error"
+        >
+          <template #default>
+            <el-button link size="small" @click="loadHistory">重试</el-button>
+          </template>
+        </el-alert>
+
         <!-- 空状态 -->
         <div v-if="messages.length === 0" class="ac-empty">
           <div class="ac-empty__icon">💬</div>
@@ -483,6 +522,26 @@ function handleContentClick(event: MouseEvent) {
   flex-direction: column;
   gap: 12px;
   min-height: 300px;
+}
+
+/* 历史加载状态 */
+.ac-history-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.ac-history-loading .is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* 空状态 */
