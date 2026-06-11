@@ -55,6 +55,17 @@ const routes: RouteRecordRaw[] = [
     path: '/deployment/decision-tree/result',
     name: 'decision-result',
     component: () => import('@/views/DecisionResultView.vue'),
+    props: (route) => {
+      const answers = route.query.answers ? JSON.parse(route.query.answers as string) : []
+      const planId = (route.query.planId as string) || ''
+      const planName = (route.query.planName as string) || ''
+      return {
+        result: {
+          answers,
+          result: { planId, planName }
+        }
+      }
+    },
     meta: { requiresAuth: false },
   },
   {
