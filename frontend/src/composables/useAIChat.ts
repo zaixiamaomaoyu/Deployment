@@ -27,11 +27,10 @@ export function useAIChat() {
    * 加载对话历史
    *
    * 从后端获取最近 50 条记录，映射为前端 ChatMessage 格式
-   * 仅在未登录或消息数组为空时执行
+   * 每次调用都会从后端重新加载最新数据
    */
   async function loadHistory() {
     if (!userStore.isLoggedIn) return
-    if (messages.value.length > 0) return // 避免重复加载
 
     isLoadingHistory.value = true
     historyError.value = null
