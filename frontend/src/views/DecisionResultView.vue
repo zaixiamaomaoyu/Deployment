@@ -31,6 +31,8 @@ function priceRangeTagType(range: 'free' | 'low' | 'medium' | 'high'): 'success'
 
 function handleGoBack() {
   emit('go-back')
+  // 跳转回决策树页面
+  router.push('/deployment/decision-tree')
 }
 
 function handleViewSteps() {
