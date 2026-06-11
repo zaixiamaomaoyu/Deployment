@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ref, nextTick, reactive } from 'vue'
+import { ref, nextTick } from 'vue'
 import AIChat from '@/components/AIChat.vue'
 import type { AIChatStatus, ChatMessage } from '@/types/ai-chat'
 
@@ -48,6 +48,7 @@ function mountAIChat(visible = true) {
       stubs: {
         ElButton: true,
         ElInput: true,
+        ElTag: true,
       },
     },
   })
@@ -119,6 +120,17 @@ describe('AIChat — 消息展示', () => {
     const wrapper = mountAIChat(true)
     expect(wrapper.text()).toContain('有问题可以问我...')
   })
+
+  it('空消息时显示常见术语快捷标签', () => {
+    const wrapper = mountAIChat(true)
+    const quickTerms = wrapper.find('[data-testid="ac-quick-terms"]')
+    expect(quickTerms.exists()).toBe(true)
+    expect(wrapper.text()).toContain('常见术语')
+    expect(quickTerms.find('[data-testid="ac-quick-term-Nginx"]').exists()).toBe(true)
+    expect(quickTerms.find('[data-testid="ac-quick-term-Docker"]').exists()).toBe(true)
+    expect(quickTerms.find('[data-testid="ac-quick-term-SSH"]').exists()).toBe(true)
+    expect(quickTerms.find('[data-testid="ac-quick-term-CI/CD"]').exists()).toBe(true)
+  })
 })
 
 describe('AIChat — 事件', () => {
@@ -149,5 +161,22 @@ describe('AIChat — 事件', () => {
     expect(clearBtn.exists()).toBe(true)
     await clearBtn.trigger('click')
     expect(mockState.clearMessages).toHaveBeenCalled()
+  })
+
+  it('点击快捷术语标签调用 sendMessage 并发送术语问题', async () => {
+    const wrapper = mountAIChat(true)
+    const nginxTag = wrapper.find('[data-testid="ac-quick-term-Nginx"]')
+    expect(nginxTag.exists()).toBe(true)
+    await nginxTag.trigger('click')
+    expect(mockState.sendMessage).toHaveBeenCalledWith('什么是 Nginx？')
+  })
+
+  it('未登录时点击快捷术语标签不调用 sendMessage', async () => {
+    mockState.userStore.isLoggedIn = false
+    const wrapper = mountAIChat(true)
+    const nginxTag = wrapper.find('[data-testid="ac-quick-term-Nginx"]')
+    expect(nginxTag.exists()).toBe(true)
+    await nginxTag.trigger('click')
+    expect(mockState.sendMessage).not.toHaveBeenCalled()
   })
 })

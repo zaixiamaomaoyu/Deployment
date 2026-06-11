@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, computed } from 'vue'
+import { ref, nextTick, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAIChat } from '@/composables/useAIChat'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
 import { ElMessage } from 'element-plus'
-import { Close, CopyDocument, RefreshRight, Delete, VideoPause } from '@element-plus/icons-vue'
+import { Close, CopyDocument, RefreshRight, Delete, VideoPause, ArrowLeft } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import type { ChatMessage } from '@/types/ai-chat'
 
 interface Props {
   visible: boolean
@@ -28,12 +27,23 @@ const inputText = ref('')
 const messagesContainerRef = ref<HTMLElement>()
 const textareaRef = ref<HTMLTextAreaElement>()
 const isInputFocused = ref(false)
+const isSending = ref(false)
 
 /** 是否正在流式输出 */
 const isStreaming = computed(() => status.value === 'streaming')
 
 /** 是否有消息可以清空 */
 const hasMessages = computed(() => messages.value.length > 0)
+
+/** 常见术语快捷标签 */
+const quickTerms = ['Nginx', 'Docker', 'SSH', 'CI/CD', '域名解析', 'SSL 证书']
+
+/** 点击快捷术语标签 */
+function handleQuickTerm(term: string) {
+  if (!userStore.isLoggedIn || isStreaming.value || isSending.value) return
+  inputText.value = `什么是 ${term}？`
+  handleSend()
+}
 
 /** 自动滚动到底部 */
 watch(
@@ -56,6 +66,18 @@ watch(
   }
 )
 
+/** 消息区域事件委托：站内链接使用 Vue Router 跳转 */
+let messageContainerEl: HTMLElement | undefined
+
+onMounted(() => {
+  messageContainerEl = messagesContainerRef.value
+  messageContainerEl?.addEventListener('click', handleContentClick)
+})
+
+onUnmounted(() => {
+  messageContainerEl?.removeEventListener('click', handleContentClick)
+})
+
 /** 滚动到消息容器底部 */
 function scrollToBottom() {
   if (messagesContainerRef.value) {
@@ -66,10 +88,15 @@ function scrollToBottom() {
 /** 发送消息 */
 async function handleSend() {
   const text = inputText.value.trim()
-  if (!text || isStreaming.value) return
+  if (!text || isStreaming.value || isSending.value) return
+  isSending.value = true
   inputText.value = ''
   autoResize()
-  await sendMessage(text)
+  try {
+    await sendMessage(text)
+  } finally {
+    isSending.value = false
+  }
   nextTick(() => textareaRef.value?.focus())
 }
 
@@ -138,7 +165,41 @@ function formatTime(timestamp: number): string {
 /** 将 Markdown 渲染为安全的 HTML */
 function renderMarkdown(content: string): string {
   const rawHtml = marked.parse(content, { async: false }) as string
-  return DOMPurify.sanitize(rawHtml)
+  const cleanHtml = DOMPurify.sanitize(rawHtml)
+  // 使用 DOM 解析处理链接属性，避免正则的边界问题（单引号、已有属性等）
+  const div = document.createElement('div')
+  div.innerHTML = cleanHtml
+  div.querySelectorAll('a').forEach((a) => {
+    const href = a.getAttribute('href') || ''
+    if (href.startsWith('http://') || href.startsWith('https://')) {
+      a.setAttribute('target', '_blank')
+      a.setAttribute('rel', 'noopener noreferrer')
+    }
+  })
+  return div.innerHTML
+}
+
+/**
+ * 拦截站内链接点击，使用 Vue Router 进行无刷新跳转
+ *
+ * 事件委托挂载在消息容器上，避免为每条消息动态绑定事件
+ */
+function handleContentClick(event: MouseEvent) {
+  // 保留修饰键和中键的默认浏览器行为（新开标签等）
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return
+
+  const target = event.target as HTMLElement
+  const anchor = target.closest('a[href^="/"]') as HTMLAnchorElement | null
+  if (!anchor) return
+
+  const href = anchor.getAttribute('href')
+  if (!href) return
+
+  // 只拦截内容详情页等站内路由链接
+  if (href.startsWith('/content/')) {
+    event.preventDefault()
+    router.push(href)
+  }
 }
 </script>
 
@@ -148,6 +209,16 @@ function renderMarkdown(content: string): string {
       <!-- 头部 -->
       <div class="ac-header">
         <div class="ac-header__title">
+          <el-button
+            v-if="hasMessages"
+            :icon="ArrowLeft"
+            circle
+            size="small"
+            class="ac-back-btn"
+            data-testid="ac-back"
+            aria-label="返回快捷术语"
+            @click="handleClear"
+          />
           <span class="ac-header__icon">🤖</span>
           <span>AI 学习助手</span>
         </div>
@@ -196,6 +267,20 @@ function renderMarkdown(content: string): string {
           <div class="ac-empty__icon">💬</div>
           <p class="ac-empty__text">有问题可以问我...</p>
           <p class="ac-empty__hint">我可以帮你解答部署相关问题</p>
+          <div class="ac-quick-terms" data-testid="ac-quick-terms">
+            <span class="ac-quick-terms__label">常见术语：</span>
+            <el-tag
+              v-for="term in quickTerms"
+              :key="term"
+              class="ac-quick-terms__tag"
+              :data-testid="`ac-quick-term-${term}`"
+              size="small"
+              effect="plain"
+              @click="handleQuickTerm(term)"
+            >
+              {{ term }}
+            </el-tag>
+          </div>
         </div>
 
         <!-- 消息列表 -->
@@ -378,6 +463,17 @@ function renderMarkdown(content: string): string {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.ac-back-btn {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  border: none !important;
+  margin-right: 4px;
+}
+
+.ac-back-btn:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
 /* 消息区域 */
 .ac-messages {
   flex: 1;
@@ -413,6 +509,33 @@ function renderMarkdown(content: string): string {
 .ac-empty__hint {
   font-size: 13px;
   color: #c0c4cc;
+}
+
+/* 快捷术语标签 */
+.ac-quick-terms {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 16px;
+}
+
+.ac-quick-terms__label {
+  font-size: 13px;
+  color: #606266;
+}
+
+.ac-quick-terms__tag {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ac-quick-terms__tag:hover {
+  color: var(--primary-color, #409eff);
+  border-color: var(--primary-color, #409eff);
+  background-color: rgba(64, 158, 255, 0.1);
 }
 
 /* 消息 */

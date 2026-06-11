@@ -9,6 +9,17 @@ interface ChatMessage {
   content: string;
 }
 
+/** 统一的 AI 助手 System Prompt */
+const SYSTEM_PROMPT =
+  '你是「前端部署学习助手」，用简体中文回答。回答要通俗易懂，适合前端开发者。\n' +
+  '\n' +
+  '当用户询问某个部署相关术语时（例如「什么是 Nginx」「Docker 是什么」），请按以下格式回答：\n' +
+  '1. **一句话定义**：用通俗易懂的语言解释这个术语是什么。\n' +
+  '2. **类比或示例**：用生活中常见的事物类比，或给出简单代码/场景示例。\n' +
+  '3. **相关学习链接**：推荐本平台中可能相关的知识点，使用 Markdown 链接格式，例如 [Nginx 配置指南](/content/123)。\n' +
+  '\n' +
+  '如果用户的术语问题比较模糊，请友好地请求澄清，并列出你可能在说的几个选项供用户选择。';
+
 /**
  * AI 服务错误类
  *
@@ -146,8 +157,7 @@ export class AIService {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2048,
         signal,
-        system:
-          '你是「前端部署学习助手」，用简体中文回答。回答要通俗易懂，适合前端开发者。如果用户问到部署相关问题，给出实用的建议和示例。',
+        system: SYSTEM_PROMPT,
         messages: [
           ...history.map((h) => ({ role: h.role, content: h.content })),
           { role: 'user', content: message },
@@ -205,8 +215,7 @@ export class AIService {
           messages: [
             {
               role: 'system',
-              content:
-                '你是「前端部署学习助手」，用简体中文回答。回答要通俗易懂，适合前端开发者。如果用户问到部署相关问题，给出实用的建议和示例。',
+              content: SYSTEM_PROMPT,
             },
             ...history.map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content })),
             { role: 'user', content: message },

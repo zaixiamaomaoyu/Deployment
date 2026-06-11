@@ -58,3 +58,18 @@
 - **M1（部分）— 注册接口主动暴露 USERNAME_EXISTS** [backend/src/controllers/auth.controller.ts:102-105] — 用户决策：保持 409 响应优先 UX，接受用户名可枚举风险；M1 时序攻击部分仍需修复
 - **D1 — bcryptjs vs bcrypt** [backend/src/controllers/auth.controller.ts:2] — 用户决策：保留 bcryptjs，需同步更新 spec Design Notes
 - **D3 — CSRF 防护** [backend/src/app.ts:39-49] — 用户决策：保持 sameSite=lax 现状，spec 未要求
+
+## Deferred from: code review of 4-4-术语解释功能 (2026-06-11)
+
+- **快捷术语标签硬编码，无配置化能力** [frontend/src/components/AIChat.vue:38] — MVP 设计选择，AC 未要求配置化
+- **activeLevel 类型从 number|undefined 扩展为 number|string|undefined** [frontend/src/views/ContentsView.vue] — 无关变更（预存 TS 错误修复）
+- **examples 类型收窄逻辑过度且冗余** [frontend/src/views/ContentDetailView.vue] — 无关变更（预存 TS 错误修复）
+- **StepGuideView.vue 移除 isPlanNotFound 后未检查模板引用** [frontend/src/views/StepGuideView.vue] — 无关变更（预存 TS 错误修复）
+- **favoriteResult 为 rejected 且 reason 不是 AxiosError 未处理** [frontend/src/views/ContentDetailView.vue:166-169] — 无关变更（预存 TS 错误修复）
+- **favoriteResult 为 rejected 且组件已卸载的竞态** [frontend/src/views/ContentDetailView.vue:166-169] — 无关变更（预存 TS 错误修复）
+- **activeLevel.value 为非法字符串时传入 API** [frontend/src/views/ContentsView.vue:83] — 无关变更（预存 TS 错误修复）
+- **streamChat 抛出的 error 不是 Error 实例时 AbortError 判断失败** [frontend/src/composables/useAIChat.ts:64] — 现有逻辑，未在本次变更中引入
+- **chunk.choices 为空数组时访问 [0]** [backend/src/services/ai.service.ts:228] — 现有逻辑，未在本次变更中引入
+- **history 中存在 role 为 system 的消息混入** [backend/src/services/ai.service.ts:220] — 现有逻辑，未在本次变更中引入
+- **useAIChat.ts 错误处理简化移除错误详情** [frontend/src/composables/useAIChat.ts] — 副作用变更，与 Story 4-4 无关
+- **ContentDetailView/ContentsView/Home/StepGuideView 变更与 Story 4-4 无关** — 范围问题，附带预存 TS 错误修复

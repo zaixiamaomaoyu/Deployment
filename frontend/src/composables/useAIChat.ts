@@ -75,7 +75,7 @@ export function useAIChat() {
         status.value = 'idle'
       } else {
         messages.value[aiMessageIndex].error = true
-        messages.value[aiMessageIndex].content = error instanceof Error ? error.message : 'AI 助手暂时不可用，请稍后再试'
+        messages.value[aiMessageIndex].content = 'AI 助手暂时不可用，请稍后再试'
         status.value = 'error'
       }
     } finally {
@@ -157,7 +157,7 @@ export function useAIChat() {
         status.value = 'idle'
       } else {
         messages.value[aiMessageIndex].error = true
-        messages.value[aiMessageIndex].content = error instanceof Error ? error.message : 'AI 助手暂时不可用，请稍后再试'
+        messages.value[aiMessageIndex].content = 'AI 助手暂时不可用，请稍后再试'
         status.value = 'error'
       }
     } finally {
