@@ -22,9 +22,6 @@ const plan = computed<DeploymentPlan | undefined>(() =>
   props.planId ? deploymentPlans[props.planId] : undefined,
 )
 
-// 错误状态
-const isPlanNotFound = computed(() => !plan.value)
-
 // 复制状态管理：记录已复制的命令
 const copiedCommand = ref<string | null>(null)
 

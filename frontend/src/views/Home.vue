@@ -4,10 +4,7 @@ import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { getContents, type Content } from '@/api/contents'
 import ContentCard from '@/components/ContentCard.vue'
-import { useUserStore } from '@/stores/user'
-
 const router = useRouter()
-const userStore = useUserStore()
 
 const contents = ref<Content[]>([])
 const loading = ref(false)

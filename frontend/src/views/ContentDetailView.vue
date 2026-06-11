@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus'
 import { Star } from '@element-plus/icons-vue'
-import axios, { AxiosError } from 'axios'
+import axios from 'axios'
 import { getContentById, getContentNeighbors, type Content } from '@/api/contents'
 import { getFavoriteStatus, toggleFavorite } from '@/api/favorites'
 import { useUserStore } from '@/stores/user'
@@ -36,8 +36,10 @@ const renderedContent = computed(() => {
 const examples = computed(() => {
   const ex = content.value?.examples
   if (!Array.isArray(ex)) return []
-  return ex.filter((item): item is { code: string; language?: string; title?: string } =>
-    item && typeof item === 'object' && 'code' in item && typeof item.code === 'string'
+  return (ex as unknown[]).filter((raw): raw is Record<string, unknown> =>
+    raw !== null && typeof raw === 'object'
+  ).filter((item): item is { code: string; language?: string; title?: string } =>
+    typeof item.code === 'string'
   )
 })
 
@@ -50,14 +52,14 @@ const domainLabels: Record<string, string> = {
   container: '容器',
 }
 
-type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | 'default'
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger' | undefined
 const domainColors: Record<string, TagType> = {
   build: 'primary',
   platform: 'success',
   server: 'warning',
   automation: 'info',
   domain: 'danger',
-  container: 'default',
+  container: undefined,
 }
 
 function formatDate(dateStr: string): string {
@@ -143,7 +145,7 @@ async function loadData() {
       return
     }
 
-    const contentRes = contentResult.value
+    const contentRes = contentResult.value as { code: string; data: Content; message: string }
     if (contentRes.code === 'SUCCESS' && contentRes.data) {
       content.value = contentRes.data
     } else {
@@ -152,7 +154,7 @@ async function loadData() {
     }
 
     if (neighborsResult.status === 'fulfilled') {
-      const neighborsRes = neighborsResult.value
+      const neighborsRes = neighborsResult.value as { code: string; data: { prev: Content | null; next: Content | null }; message: string }
       if (neighborsRes.code === 'SUCCESS' && neighborsRes.data) {
         neighbors.value = neighborsRes.data
       }
@@ -161,7 +163,7 @@ async function loadData() {
     // 收藏状态：仅在校验 content 加载成功后才应用（避免 404 时仍覆盖状态）
     if (userStore.isLoggedIn && favoriteResult) {
       if (favoriteResult.status === 'fulfilled') {
-        const favRes = favoriteResult.value
+        const favRes = favoriteResult.value as { code: string; data: { isFavorited: boolean }; message: string }
         if (favRes.code === 'SUCCESS' && favRes.data) {
           isFavorited.value = Boolean(favRes.data.isFavorited)
         }

@@ -10,7 +10,7 @@ const route = useRoute()
 const loading = ref(false)
 const contents = ref<Content[]>([])
 const activeDomain = ref('')
-const activeLevel = ref<number | undefined>(undefined)
+const activeLevel = ref<number | string | undefined>(undefined)
 const searchQuery = ref('')
 const error = ref('')
 let abortController: AbortController | null = null
@@ -40,7 +40,7 @@ const validDomains = new Set(Object.keys(domainLabels))
 const domainKeys = Object.keys(domainLabels)
 
 const levelOptions = [
-  { label: '全部层级', value: undefined as number | undefined },
+  { label: '全部层级', value: '' },
   { label: 'Lv1', value: 1 },
   { label: 'Lv2', value: 2 },
   { label: 'Lv3', value: 3 },
@@ -80,9 +80,10 @@ async function loadData() {
   loading.value = true
   error.value = ''
   try {
+    const levelValue = activeLevel.value === '' ? undefined : (activeLevel.value as number | undefined)
     const res = await getContents(
       activeDomain.value || undefined,
-      activeLevel.value,
+      levelValue,
       searchQuery.value || undefined,
       1,
       20,
