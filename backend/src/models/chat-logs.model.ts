@@ -59,7 +59,7 @@ export class ChatLogsModel {
       ORDER BY created_at ASC
       LIMIT ?
     `;
-    const [rows] = await pool.execute(query, [userId, limit]);
+    const [rows] = await pool.query(query, [userId, limit]);
     return rows as ChatHistoryItem[];
   }
 

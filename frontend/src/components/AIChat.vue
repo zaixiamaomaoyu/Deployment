@@ -56,17 +56,25 @@ watch(
   { deep: true }
 )
 
-/** 打开面板时滚动到底部，并在首次打开时加载历史 */
+/** 打开面板时滚动到底部，并加载历史记录 */
+let hasLoadedHistory = false
+
 watch(
   () => props.visible,
   async (newVal) => {
     if (newVal) {
       await nextTick()
       scrollToBottom()
-      // 仅在无消息时加载历史，避免覆盖当前对话
-      if (messages.value.length === 0) {
-        loadHistory()
+      // 每次打开面板时都加载历史，确保显示最新数据
+      // loadHistory 内部会检查 messages.value.length > 0 避免重复加载
+      // 但如果用户清空了消息后再打开，应该重新加载
+      if (!hasLoadedHistory || messages.value.length === 0) {
+        await loadHistory()
+        hasLoadedHistory = true
       }
+    } else {
+      // 关闭面板时重置标志，下次打开时重新加载
+      hasLoadedHistory = false
     }
   }
 )
@@ -161,6 +169,15 @@ function handleStop() {
   stopStreaming()
 }
 
+/** 返回快捷术语（仅清空前端状态，不删除后端历史） */
+function handleBack() {
+  if (isStreaming.value) {
+    stopStreaming()
+  }
+  messages.value = []
+  status.value = 'idle'
+}
+
 /** 关闭面板 */
 function handleClose() {
   emit('update:visible', false)
@@ -236,7 +253,7 @@ function handleContentClick(event: MouseEvent) {
             class="ac-back-btn"
             data-testid="ac-back"
             aria-label="返回快捷术语"
-            @click="handleClear"
+            @click="handleBack"
           />
           <span class="ac-header__icon">🤖</span>
           <span>AI 学习助手</span>
