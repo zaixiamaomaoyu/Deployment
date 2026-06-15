@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { deploymentPlans } from '@/data/deployment-plans'
+import { deploymentPlanSteps } from '@/data/deployment-plan-steps'
 import { copyToClipboard } from '@/utils/copy-to-clipboard'
-import type { DeploymentPlan } from '@/types/deployment-plan'
+import type { DeploymentPlan, DeploymentStep } from '@/types/deployment-plan'
 
 interface Props {
   planId: string
@@ -22,41 +23,92 @@ const plan = computed<DeploymentPlan | undefined>(() =>
   props.planId ? deploymentPlans[props.planId] : undefined,
 )
 
+// 读取该方案的步骤列表
+const steps = computed<DeploymentStep[]>(() =>
+  props.planId ? deploymentPlanSteps[props.planId] || [] : [],
+)
+
+// 计算总预计耗时（仅累加大于 0 的整数）
+const totalEstimatedMinutes = computed(() =>
+  steps.value.reduce((sum, step) => {
+    const minutes = step.estimatedMinutes
+    if (typeof minutes === 'number' && Number.isInteger(minutes) && minutes > 0) {
+      return sum + minutes
+    }
+    return sum
+  }, 0),
+)
+
+// 错误状态
+const isPlanNotFound = computed(() => !plan.value)
+
+// 步骤数据是否缺失（plan 存在但无步骤）
+const isStepsEmpty = computed(() => plan.value !== undefined && steps.value.length === 0)
+
 // 复制状态管理：记录已复制的命令
 const copiedCommand = ref<string | null>(null)
+const copyResetTimer = shallowRef<ReturnType<typeof setTimeout> | null>(null)
 
-// 占位步骤数据（Story 3-5 将替换为来自 deploymentPlans 的真实步骤数据）
-const placeholderSteps = [
-  {
-    title: '步骤 1：环境准备',
-    description: '确保本地环境满足部署要求',
-    command: 'git clone https://github.com/your-repo.git',
+function clearCopyResetTimer() {
+  if (copyResetTimer.value) {
+    clearTimeout(copyResetTimer.value)
+    copyResetTimer.value = null
+  }
+}
+
+// planId 变化时重置复制状态，避免状态泄漏到新方案
+watch(
+  () => props.planId,
+  () => {
+    copiedCommand.value = null
+    clearCopyResetTimer()
   },
-  {
-    title: '步骤 2：安装依赖',
-    description: '安装项目所需的依赖包',
-    command: 'npm install',
-  },
-  {
-    title: '步骤 3：构建项目',
-    description: '执行构建命令生成生产产物',
-    command: 'npm run build',
-  },
-]
+)
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearCopyResetTimer()
+})
 
 // 复制命令
 async function handleCopyCommand(command: string) {
+  if (!command || !command.trim()) {
+    ElMessage.warning('无可复制内容')
+    return
+  }
   try {
     await copyToClipboard(command)
     copiedCommand.value = command
     ElMessage.success('命令已复制到剪贴板')
-    setTimeout(() => {
+
+    clearCopyResetTimer()
+    copyResetTimer.value = setTimeout(() => {
       copiedCommand.value = null
+      copyResetTimer.value = null
     }, 2000)
   } catch {
+    if (copiedCommand.value === command) {
+      copiedCommand.value = null
+    }
+    clearCopyResetTimer()
     ElMessage.error('复制失败，请手动复制')
   }
 }
+
+// externalUrl 格式校验：必须是有效的 https URL
+const safeExternalUrl = computed(() => {
+  const url = plan.value?.externalUrl?.trim()
+  if (!url) return undefined
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol === 'https:' && parsed.hostname) {
+      return url
+    }
+  } catch {
+    // URL 解析失败，返回 undefined
+  }
+  return undefined
+})
 
 // 返回决策树
 function handleGoBack() {
@@ -113,10 +165,15 @@ function handleGoBack() {
       </div>
 
       <!-- 外部链接 -->
-      <div v-if="plan.externalUrl" class="sg-external-url">
+      <div v-if="safeExternalUrl" class="sg-external-url">
         <h3>官方文档</h3>
-        <el-link :href="plan.externalUrl" target="_blank" type="primary">
-          {{ plan.externalUrl }}
+        <el-link
+          data-testid="sg-external-link"
+          :href="safeExternalUrl"
+          target="_blank"
+          type="primary"
+        >
+          {{ safeExternalUrl }}
         </el-link>
       </div>
     </el-card>
@@ -124,19 +181,42 @@ function handleGoBack() {
     <!-- 步骤列表 -->
     <el-card class="sg-steps-card">
       <h2>部署步骤</h2>
-      <div class="sg-steps">
+      <p
+        v-if="totalEstimatedMinutes > 0 && !isStepsEmpty"
+        data-testid="sg-total-time"
+        class="sg-total-time"
+      >
+        预计总耗时：约 {{ totalEstimatedMinutes }} 分钟
+      </p>
+
+      <!-- 空步骤提示 -->
+      <div v-if="isStepsEmpty" class="sg-empty-steps" data-testid="sg-empty-steps">
+        <p>该方案暂无步骤指南，请稍后再试或联系管理员。</p>
+      </div>
+
+      <div v-else class="sg-steps">
         <div
-          v-for="(step, idx) in placeholderSteps"
-          :key="idx"
+          v-for="(step, idx) in steps"
+          :key="`${props.planId}-${step.title}-${idx}`"
           class="sg-step-item"
+          :data-testid="`sg-step-${idx}`"
         >
           <h3>{{ step.title }}</h3>
           <p>{{ step.description }}</p>
-          <div class="sg-code-block">
+          <p
+            v-if="step.estimatedMinutes"
+            class="sg-step-time"
+            :data-testid="`sg-step-time-${idx}`"
+          >
+            预计耗时：{{ step.estimatedMinutes }} 分钟
+          </p>
+
+          <div v-if="step.command" class="sg-code-block">
             <pre><code>{{ step.command }}</code></pre>
             <el-button
               size="small"
               :type="copiedCommand === step.command ? 'success' : 'primary'"
+              :data-testid="`sg-copy-${idx}`"
               @click="handleCopyCommand(step.command)"
             >
               {{ copiedCommand === step.command ? '已复制' : '一键复制' }}
@@ -207,8 +287,24 @@ function handleGoBack() {
 
 .sg-steps-card h2 {
   font-size: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: var(--accent);
+}
+
+.sg-total-time {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 16px;
+}
+
+.sg-empty-steps {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--el-text-color-secondary);
+}
+
+.sg-empty-steps p {
+  margin: 0;
 }
 
 .sg-step-item {
@@ -229,7 +325,12 @@ function handleGoBack() {
 .sg-step-item p {
   font-size: 14px;
   color: var(--el-text-color-regular);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+}
+
+.sg-step-time {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 
 .sg-code-block {
@@ -239,6 +340,7 @@ function handleGoBack() {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 12px;
 }
 
 .sg-code-block pre {

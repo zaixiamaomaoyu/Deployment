@@ -24,3 +24,15 @@ export interface DeploymentPlan {
   /** 官方链接（可选），必须以 https:// 开头 */
   externalUrl?: string
 }
+
+/** 单个部署步骤 */
+export interface DeploymentStep {
+  /** 步骤标题，≤ 30 字符 */
+  title: string
+  /** 步骤描述，≤ 200 字符 */
+  description: string
+  /** 可一键复制的命令/代码片段（可选） */
+  command?: string
+  /** 预计耗时分钟数，> 0 的整数（可选） */
+  estimatedMinutes?: number
+}

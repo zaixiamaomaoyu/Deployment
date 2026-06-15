@@ -1,0 +1,904 @@
+diff --git a/frontend/src/types/deployment-plan.ts b/frontend/src/types/deployment-plan.ts
+index 13eb800..12d428f 100644
+--- a/frontend/src/types/deployment-plan.ts
++++ b/frontend/src/types/deployment-plan.ts
+@@ -24,3 +24,15 @@ export interface DeploymentPlan {
+   /** 官方链接（可选），必须以 https:// 开头 */
+   externalUrl?: string
+ }
++
++/** 单个部署步骤 */
++export interface DeploymentStep {
++  /** 步骤标题，≤ 30 字符 */
++  title: string
++  /** 步骤描述，≤ 200 字符 */
++  description: string
++  /** 可一键复制的命令/代码片段（可选） */
++  command?: string
++  /** 预计耗时分钟数，> 0 的整数（可选） */
++  estimatedMinutes?: number
++}
+diff --git a/frontend/src/views/StepGuideView.vue b/frontend/src/views/StepGuideView.vue
+index 035d061..c7a23d6 100644
+--- a/frontend/src/views/StepGuideView.vue
++++ b/frontend/src/views/StepGuideView.vue
+@@ -3,8 +3,9 @@ import { computed, ref } from 'vue'
+ import { useRouter } from 'vue-router'
+ import { ElMessage } from 'element-plus'
+ import { deploymentPlans } from '@/data/deployment-plans'
++import { deploymentPlanSteps } from '@/data/deployment-plan-steps'
+ import { copyToClipboard } from '@/utils/copy-to-clipboard'
+-import type { DeploymentPlan } from '@/types/deployment-plan'
++import type { DeploymentPlan, DeploymentStep } from '@/types/deployment-plan'
+ 
+ interface Props {
+   planId: string
+@@ -22,27 +23,25 @@ const plan = computed<DeploymentPlan | undefined>(() =>
+   props.planId ? deploymentPlans[props.planId] : undefined,
+ )
+ 
++// 读取该方案的步骤列表
++const steps = computed<DeploymentStep[]>(() =>
++  props.planId ? deploymentPlanSteps[props.planId] || [] : [],
++)
++
++// 计算总预计耗时
++const totalEstimatedMinutes = computed(() =>
++  steps.value.reduce((sum, step) => sum + (step.estimatedMinutes || 0), 0),
++)
++
++// 错误状态
++const isPlanNotFound = computed(() => !plan.value)
++
++// 步骤数据是否缺失（plan 存在但无步骤）
++const isStepsEmpty = computed(() => plan.value !== undefined && steps.value.length === 0)
++
+ // 复制状态管理：记录已复制的命令
+ const copiedCommand = ref<string | null>(null)
+-
+-// 占位步骤数据（Story 3-5 将替换为来自 deploymentPlans 的真实步骤数据）
+-const placeholderSteps = [
+-  {
+-    title: '步骤 1：环境准备',
+-    description: '确保本地环境满足部署要求',
+-    command: 'git clone https://github.com/your-repo.git',
+-  },
+-  {
+-    title: '步骤 2：安装依赖',
+-    description: '安装项目所需的依赖包',
+-    command: 'npm install',
+-  },
+-  {
+-    title: '步骤 3：构建项目',
+-    description: '执行构建命令生成生产产物',
+-    command: 'npm run build',
+-  },
+-]
++let copyResetTimer: ReturnType<typeof setTimeout> | null = null
+ 
+ // 复制命令
+ async function handleCopyCommand(command: string) {
+@@ -50,14 +49,31 @@ async function handleCopyCommand(command: string) {
+     await copyToClipboard(command)
+     copiedCommand.value = command
+     ElMessage.success('命令已复制到剪贴板')
+-    setTimeout(() => {
++
++    if (copyResetTimer) {
++      clearTimeout(copyResetTimer)
++    }
++    copyResetTimer = setTimeout(() => {
+       copiedCommand.value = null
++      copyResetTimer = null
+     }, 2000)
+   } catch {
++    copiedCommand.value = null
++    if (copyResetTimer) {
++      clearTimeout(copyResetTimer)
++      copyResetTimer = null
++    }
+     ElMessage.error('复制失败，请手动复制')
+   }
+ }
+ 
++// externalUrl 格式校验：必须以 https:// 开头
++const safeExternalUrl = computed(() => {
++  if (!plan.value?.externalUrl) return undefined
++  const url = plan.value.externalUrl.trim()
++  return url.startsWith('https://') ? url : undefined
++})
++
+ // 返回决策树
+ function handleGoBack() {
+   emit('go-back')
+@@ -113,10 +129,15 @@ function handleGoBack() {
+       </div>
+ 
+       <!-- 外部链接 -->
+-      <div v-if="plan.externalUrl" class="sg-external-url">
++      <div v-if="safeExternalUrl" class="sg-external-url">
+         <h3>官方文档</h3>
+-        <el-link :href="plan.externalUrl" target="_blank" type="primary">
+-          {{ plan.externalUrl }}
++        <el-link
++          data-testid="sg-external-link"
++          :href="safeExternalUrl"
++          target="_blank"
++          type="primary"
++        >
++          {{ safeExternalUrl }}
+         </el-link>
+       </div>
+     </el-card>
+@@ -124,19 +145,42 @@ function handleGoBack() {
+     <!-- 步骤列表 -->
+     <el-card class="sg-steps-card">
+       <h2>部署步骤</h2>
+-      <div class="sg-steps">
++      <p
++        v-if="totalEstimatedMinutes > 0 && !isStepsEmpty"
++        data-testid="sg-total-time"
++        class="sg-total-time"
++      >
++        预计总耗时：约 {{ totalEstimatedMinutes }} 分钟
++      </p>
++
++      <!-- 空步骤提示 -->
++      <div v-if="isStepsEmpty" class="sg-empty-steps" data-testid="sg-empty-steps">
++        <p>该方案暂无步骤指南，请稍后再试或联系管理员。</p>
++      </div>
++
++      <div v-else class="sg-steps">
+         <div
+-          v-for="(step, idx) in placeholderSteps"
+-          :key="idx"
++          v-for="(step, idx) in steps"
++          :key="`${props.planId}-${idx}`"
+           class="sg-step-item"
++          :data-testid="`sg-step-${idx}`"
+         >
+           <h3>{{ step.title }}</h3>
+           <p>{{ step.description }}</p>
+-          <div class="sg-code-block">
++          <p
++            v-if="step.estimatedMinutes"
++            class="sg-step-time"
++            :data-testid="`sg-step-time-${idx}`"
++          >
++            预计耗时：{{ step.estimatedMinutes }} 分钟
++          </p>
++
++          <div v-if="step.command" class="sg-code-block">
+             <pre><code>{{ step.command }}</code></pre>
+             <el-button
+               size="small"
+               :type="copiedCommand === step.command ? 'success' : 'primary'"
++              :data-testid="`sg-copy-${idx}`"
+               @click="handleCopyCommand(step.command)"
+             >
+               {{ copiedCommand === step.command ? '已复制' : '一键复制' }}
+@@ -207,10 +251,26 @@ function handleGoBack() {
+ 
+ .sg-steps-card h2 {
+   font-size: 20px;
+-  margin-bottom: 16px;
++  margin-bottom: 12px;
+   color: var(--accent);
+ }
+ 
++.sg-total-time {
++  font-size: 14px;
++  color: var(--el-text-color-secondary);
++  margin-bottom: 16px;
++}
++
++.sg-empty-steps {
++  text-align: center;
++  padding: 32px 16px;
++  color: var(--el-text-color-secondary);
++}
++
++.sg-empty-steps p {
++  margin: 0;
++}
++
+ .sg-step-item {
+   margin-bottom: 24px;
+   padding-bottom: 16px;
+@@ -229,7 +289,12 @@ function handleGoBack() {
+ .sg-step-item p {
+   font-size: 14px;
+   color: var(--el-text-color-regular);
+-  margin-bottom: 12px;
++  margin-bottom: 8px;
++}
++
++.sg-step-time {
++  font-size: 13px;
++  color: var(--el-text-color-secondary);
+ }
+ 
+ .sg-code-block {
+@@ -239,6 +304,7 @@ function handleGoBack() {
+   display: flex;
+   align-items: center;
+   gap: 12px;
++  margin-top: 12px;
+ }
+ 
+ .sg-code-block pre {
+diff --git a/frontend/src/views/__tests__/StepGuideView.spec.ts b/frontend/src/views/__tests__/StepGuideView.spec.ts
+index 85da103..e7ba962 100644
+--- a/frontend/src/views/__tests__/StepGuideView.spec.ts
++++ b/frontend/src/views/__tests__/StepGuideView.spec.ts
+@@ -1,6 +1,8 @@
+ import { describe, it, expect, vi } from 'vitest'
+-import { mount } from '@vue/test-utils'
++import { mount, flushPromises } from '@vue/test-utils'
+ import StepGuideView from '../StepGuideView.vue'
++import { deploymentPlanSteps } from '@/data/deployment-plan-steps'
++import { copyToClipboard } from '@/utils/copy-to-clipboard'
+ 
+ // Mock ElMessage
+ vi.mock('element-plus', () => ({
+@@ -16,15 +18,17 @@ vi.mock('@/utils/copy-to-clipboard', () => ({
+ }))
+ 
+ describe('StepGuideView', () => {
+-  function mountView(planId: string) {
+-    return mount(StepGuideView, {
++  async function mountView(planId: string) {
++    const wrapper = mount(StepGuideView, {
+       props: { planId },
+     })
++    await flushPromises()
++    return wrapper
+   }
+ 
+   describe('渲染方案名称和简介', () => {
+     it('应该渲染方案名称', async () => {
+-      const wrapper = mountView('github-pages')
++      const wrapper = await mountView('github-pages')
+       await wrapper.vm.$nextTick()
+ 
+       const title = wrapper.find('[data-testid="sg-title"]')
+@@ -32,7 +36,7 @@ describe('StepGuideView', () => {
+     })
+ 
+     it('应该渲染方案简介', async () => {
+-      const wrapper = mountView('vercel-static')
++      const wrapper = await mountView('vercel-static')
+       await wrapper.vm.$nextTick()
+ 
+       const intro = wrapper.find('[data-testid="sg-intro"]')
+@@ -40,9 +44,76 @@ describe('StepGuideView', () => {
+     })
+   })
+ 
++  describe('真实步骤渲染', () => {
++    it('应该渲染该方案的所有步骤', async () => {
++      const wrapper = await mountView('github-pages')
++      await wrapper.vm.$nextTick()
++
++      const steps = deploymentPlanSteps['github-pages']
++      for (let idx = 0; idx < steps.length; idx++) {
++        const stepEl = wrapper.find(`[data-testid="sg-step-${idx}"]`)
++        expect(stepEl.exists()).toBe(true)
++        expect(stepEl.text()).toContain(steps[idx].title)
++        expect(stepEl.text()).toContain(steps[idx].description)
++      }
++    })
++
++    it('应该渲染总预计耗时', async () => {
++      const wrapper = await mountView('github-pages')
++      await wrapper.vm.$nextTick()
++
++      const totalTime = wrapper.find('[data-testid="sg-total-time"]')
++      expect(totalTime.exists()).toBe(true)
++
++      const expectedTotal = deploymentPlanSteps['github-pages'].reduce(
++        (sum, step) => sum + (step.estimatedMinutes || 0),
++        0,
++      )
++      expect(totalTime.text()).toContain(String(expectedTotal))
++    })
++
++    it('不包含 command 的步骤不显示复制按钮', async () => {
++      // 使用一个 command 为空的步骤进行测试：这里通过临时覆盖数据较复杂，
++      // 改为验证所有步骤的复制按钮数量等于有 command 的步骤数量
++      const wrapper = await mountView('github-pages')
++      await wrapper.vm.$nextTick()
++
++      const steps = deploymentPlanSteps['github-pages']
++      const stepsWithCommand = steps.filter((s) => s.command).length
++      const copyButtons = wrapper.findAll('[data-testid^="sg-copy-"]')
++      expect(copyButtons.length).toBe(stepsWithCommand)
++    })
++
++    it('包含 command 的步骤显示代码块和复制按钮', async () => {
++      const wrapper = await mountView('github-pages')
++      await wrapper.vm.$nextTick()
++
++      const copyButton = wrapper.find('[data-testid="sg-copy-0"]')
++      expect(copyButton.exists()).toBe(true)
++      expect(copyButton.text()).toBe('一键复制')
++
++      const codeBlock = wrapper.find('[data-testid="sg-step-0"] .sg-code-block')
++      expect(codeBlock.exists()).toBe(true)
++    })
++
++    it('应该渲染步骤预计耗时', async () => {
++      const wrapper = await mountView('github-pages')
++      await wrapper.vm.$nextTick()
++
++      const steps = deploymentPlanSteps['github-pages']
++      for (let idx = 0; idx < steps.length; idx++) {
++        if (steps[idx].estimatedMinutes) {
++          const timeEl = wrapper.find(`[data-testid="sg-step-time-${idx}"]`)
++          expect(timeEl.exists()).toBe(true)
++          expect(timeEl.text()).toContain(`${steps[idx].estimatedMinutes} 分钟`)
++        }
++      }
++    })
++  })
++
+   describe('planId 不存在时的错误处理', () => {
+     it('planId 不存在时显示错误提示', async () => {
+-      const wrapper = mountView('invalid-plan-id')
++      const wrapper = await mountView('invalid-plan-id')
+       await wrapper.vm.$nextTick()
+ 
+       const error = wrapper.find('[data-testid="sg-error"]')
+@@ -51,7 +122,7 @@ describe('StepGuideView', () => {
+     })
+ 
+     it('planId 不存在时不渲染方案内容', async () => {
+-      const wrapper = mountView('invalid-plan-id')
++      const wrapper = await mountView('invalid-plan-id')
+       await wrapper.vm.$nextTick()
+ 
+       const title = wrapper.find('[data-testid="sg-title"]')
+@@ -62,7 +133,7 @@ describe('StepGuideView', () => {
+     })
+ 
+     it('planId 为空字符串时显示错误提示', async () => {
+-      const wrapper = mountView('')
++      const wrapper = await mountView('')
+       await wrapper.vm.$nextTick()
+ 
+       const error = wrapper.find('[data-testid="sg-error"]')
+@@ -71,8 +142,8 @@ describe('StepGuideView', () => {
+   })
+ 
+   describe('testid 全部存在', () => {
+-    it('所有必需的 testid 应该存在', async () => {
+-      const wrapper = mountView('github-pages')
++    it('正常状态下的必需 testid 应该存在', async () => {
++      const wrapper = await mountView('github-pages')
+       await wrapper.vm.$nextTick()
+ 
+       const testids = [
+@@ -82,37 +153,52 @@ describe('StepGuideView', () => {
+         'sg-cons',
+         'sg-suited-for',
+         'sg-back',
+-        'sg-error',
++        'sg-total-time',
++        'sg-step-0',
++        'sg-step-time-0',
++        'sg-copy-0',
++        'sg-external-link',
+       ]
+-      testids.forEach((testid) => {
++      for (const testid of testids) {
+         const element = wrapper.find(`[data-testid="${testid}"]`)
+         expect(element.exists()).toBe(true)
+-      })
++      }
++    })
++
++    it('错误状态下的必需 testid 应该存在', async () => {
++      const wrapper = await mountView('invalid-plan-id')
++      await wrapper.vm.$nextTick()
++
++      const error = wrapper.find('[data-testid="sg-error"]')
++      expect(error.exists()).toBe(true)
++
++      const backButton = wrapper.find('[data-testid="sg-back"]')
++      expect(backButton.exists()).toBe(true)
+     })
+   })
+ 
+   describe('外部链接渲染', () => {
+     it('有 externalUrl 时应该渲染 el-link', async () => {
+-      const wrapper = mountView('github-pages')
++      const wrapper = await mountView('github-pages')
+       await wrapper.vm.$nextTick()
+ 
+-      const link = wrapper.find('.sg-external-url .el-link')
++      const link = wrapper.find('[data-testid="sg-external-link"]')
+       expect(link.exists()).toBe(true)
+       expect(link.attributes('href')).toBe('https://pages.github.com')
+     })
+   })
+ 
+-  describe('代码块和复制按钮', () => {
+-    it('应该渲染代码块和复制按钮', async () => {
+-      const wrapper = mountView('github-pages')
++  describe('复制按钮交互', () => {
++    it('点击复制按钮应该调用 copyToClipboard', async () => {
++      const wrapper = await mountView('github-pages')
+       await wrapper.vm.$nextTick()
+ 
+-      const codeBlocks = wrapper.findAll('.sg-code-block')
+-      expect(codeBlocks.length).toBeGreaterThan(0)
++      const copyButton = wrapper.find('[data-testid="sg-copy-0"]')
++      expect(copyButton.exists()).toBe(true)
++
++      await copyButton.trigger('click')
+ 
+-      const copyButtons = wrapper.findAll('.sg-code-block button')
+-      expect(copyButtons.length).toBeGreaterThan(0)
+-      expect(copyButtons[0].text()).toBe('一键复制')
++      expect(copyToClipboard).toHaveBeenCalled()
+     })
+   })
+ })
+diff --git a/frontend/src/data/deployment-plan-steps.ts b/frontend/src/data/deployment-plan-steps.ts
+new file mode 100644
+index 0000000..0f1ad01
+--- /dev/null
++++ b/frontend/src/data/deployment-plan-steps.ts
+@@ -0,0 +1,365 @@
++// Story 3-5: 部署方案步骤指南数据
++// 数据维护规则：
++//   1. planId 必须与 deploymentPlans 中的 key 严格对齐
++//   2. 每个方案 3-8 个步骤
++//   3. title/description 必填，command/estimatedMinutes 可选
++//   4. command 中若包含占位符（如 yourname），需在 description 中说明替换方式
++//   5. 文案使用简体中文
++//   6. 修改后必须通过 deployment-plan-steps.spec.ts 全部用例
++
++import type { DeploymentStep } from '@/types/deployment-plan'
++
++/**
++ * 各部署方案的详细步骤指南。
++ *
++ * 维护规则：
++ * - 新增方案时，先在 deploymentPlans 中注册，再在此添加步骤
++ * - 每个 planId 至少 3 个步骤，最多 8 个
++ * - title ≤ 30 字符，description ≤ 200 字符
++ * - command 为真实可执行的命令或配置片段
++ * - estimatedMinutes 为大于 0 的整数
++ */
++export const deploymentPlanSteps: Record<string, DeploymentStep[]> = {
++  'github-pages': [
++    {
++      title: '添加远程仓库',
++      description: '在 GitHub 新建公开仓库后，将本地项目与远程仓库关联。',
++      command: 'git remote add origin https://github.com/yourname/your-repo.git',
++      estimatedMinutes: 2,
++    },
++    {
++      title: '推送到 main 分支',
++      description: '将本地代码推送到 GitHub 的 main 分支。',
++      command: 'git push -u origin main',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '启用 GitHub Pages',
++      description: '进入仓库 Settings → Pages，选择 main 分支和 /(root) 作为发布源。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '等待构建并访问',
++      description: 'GitHub Actions 自动部署后，通过 https://yourname.github.io/your-repo 访问。',
++      estimatedMinutes: 5,
++    },
++  ],
++
++  'vercel-static': [
++    {
++      title: '注册并导入项目',
++      description: '访问 vercel.com，使用 GitHub 账号登录，导入目标仓库。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '配置构建命令',
++      description: '在项目设置中确认 Framework Preset 为对应框架，构建命令通常为 npm run build。',
++      command: 'npm run build',
++      estimatedMinutes: 2,
++    },
++    {
++      title: '部署并查看域名',
++      description: 'Vercel 自动完成首次部署，页面会显示默认的 .vercel.app 域名。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '绑定自定义域名（可选）',
++      description: '在 Project Settings → Domains 中添加自己的域名，并按提示配置 DNS。',
++      estimatedMinutes: 10,
++    },
++  ],
++
++  'cloudflare-pages': [
++    {
++      title: '登录 Cloudflare Dashboard',
++      description: '访问 dash.cloudflare.com，使用已有账号登录或注册。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '连接 Git 仓库',
++      description: '在 Pages 页面点击「创建项目」，选择 GitHub 仓库并授权。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '配置构建设置',
++      description: '设置构建命令和输出目录，例如构建命令 npm run build，输出目录 dist。',
++      command: 'npm run build',
++      estimatedMinutes: 2,
++    },
++    {
++      title: '保存并部署',
++      description: '点击「保存并部署」，Cloudflare 会自动构建并发布到全球边缘网络。',
++      estimatedMinutes: 5,
++    },
++  ],
++
++  'netlify-free': [
++    {
++      title: '登录 Netlify',
++      description: '访问 netlify.com 并使用 GitHub/GitLab 账号登录。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '导入仓库',
++      description: '点击「Add new site」→「Import an existing project」，选择仓库。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '确认构建设置',
++      description: 'Netlify 会自动识别框架，确认 Build command 和 Publish directory 正确。',
++      command: 'npm run build',
++      estimatedMinutes: 2,
++    },
++    {
++      title: '部署站点',
++      description: '点击「Deploy site」，等待构建完成后访问自动分配的 .netlify.app 域名。',
++      estimatedMinutes: 5,
++    },
++  ],
++
++  'vercel-serverless': [
++    {
++      title: '准备前后端同仓项目',
++      description: '确保项目根目录包含 api/ 目录或 pages/api/ 目录用于存放 Serverless Functions。',
++      command: 'mkdir api && touch api/hello.ts',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '编写函数入口',
++      description: '在 api/ 目录下创建 hello.ts 文件，写入以下默认处理器代码。',
++      command: 'export default function handler(req, res) {\n  res.status(200).json({ message: "Hello" })\n}',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '推送到 Git 并导入 Vercel',
++      description: '将代码推送到 GitHub，在 Vercel 导入项目，框架预设会自动识别函数目录。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '测试函数接口',
++      description: '部署完成后访问 https://your-project.vercel.app/api/hello 验证函数响应。',
++      estimatedMinutes: 3,
++    },
++  ],
++
++  'railway-free': [
++    {
++      title: '注册 Railway 账号',
++      description: '访问 railway.app，使用 GitHub 账号注册并验证邮箱。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '新建项目并部署',
++      description: '点击「New Project」→「Deploy from GitHub repo」，选择目标仓库。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '查看部署日志',
++      description: 'Railway 自动检测启动命令，可在 Deployments 页面查看构建和运行日志。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '生成域名并访问',
++      description: '部署成功后，Railway 会自动生成 .up.railway.app 域名。',
++      estimatedMinutes: 2,
++    },
++  ],
++
++  'railway': [
++    {
++      title: '绑定支付方式',
++      description: '在 Railway 账单页面绑定信用卡或 PayPal，用于按用量付费。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '添加数据库服务',
++      description: '在项目内点击「New」→「Database」→「Add PostgreSQL」，等待数据库就绪。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '配置环境变量',
++      description: '在 Railway 项目的 Variables 页面添加 DATABASE_URL 环境变量，值可从已创建的 Postgres 服务详情中复制。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '扩缩容与监控',
++      description: '根据流量调整服务实例数，并通过 Railway 面板查看资源使用情况。',
++      estimatedMinutes: 5,
++    },
++  ],
++
++  'render': [
++    {
++      title: '注册 Render 账号',
++      description: '访问 render.com，使用 GitHub/GitLab 账号登录。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '创建 Web Service',
++      description: '点击「New +」→「Web Service」，选择目标 Git 仓库。',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '配置启动命令',
++      description: '填写 Build Command 和 Start Command，例如 npm run build 和 npm start。',
++      command: 'npm run build',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '添加 PostgreSQL',
++      description: '点击「New +」→「PostgreSQL」，创建后在内网连接字符串中复制 DATABASE_URL。',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '部署并访问',
++      description: '保存设置后 Render 自动构建部署，访问 .onrender.com 域名查看效果。',
++      estimatedMinutes: 5,
++    },
++  ],
++
++  'vps-baota': [
++    {
++      title: '购买 VPS 并获取 SSH 信息',
++      description: '在阿里云/腾讯云/轻量应用服务器等购买 VPS，记录 IP、用户名和密码。',
++      estimatedMinutes: 10,
++    },
++    {
++      title: 'SSH 连接服务器',
++      description: '使用终端通过 SSH 登录到服务器。',
++      command: 'ssh root@your-server-ip',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '安装宝塔面板',
++      description: '在服务器上执行宝塔官方安装脚本。',
++      command: 'yum install -y wget && wget -O install.sh https://download.bt.cn/install/install_6.0.sh && sh install.sh',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '登录宝塔并安装 LNMP',
++      description: '通过安装完成后提示的面板地址登录，一键安装 Nginx + MySQL + PHP。',
++      estimatedMinutes: 15,
++    },
++    {
++      title: '上传项目并配置站点',
++      description: '在宝塔「网站」中添加站点，上传构建产物到站点根目录，配置 Nginx 伪静态规则。',
++      estimatedMinutes: 15,
++    },
++  ],
++
++  'vps-docker': [
++    {
++      title: '准备 VPS 环境',
++      description: '购买 VPS 并安装 Docker 和 Docker Compose。',
++      command: 'sudo apt update && sudo apt install -y docker.io docker-compose',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '编写 Dockerfile',
++      description: '在项目根目录创建名为 Dockerfile 的文件，写入以下内容定义应用镜像。',
++      command: 'FROM node:20-alpine\nWORKDIR /app\nCOPY . .\nRUN npm install && npm run build\nCMD ["npm", "start"]',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '编写 docker-compose.yml',
++      description: '在项目根目录创建名为 docker-compose.yml 的文件，写入以下内容定义服务。',
++      command: 'version: "3.8"\nservices:\n  web:\n    build: .\n    ports:\n      - "80:3000"',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '构建并启动服务',
++      description: '在服务器上拉取代码后执行 docker-compose up 启动所有服务。',
++      command: 'docker-compose up -d --build',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '配置 Nginx 反向代理',
++      description: '安装 Nginx 后，在 /etc/nginx/sites-available/default 或对应配置文件中写入以下内容，将请求反向代理到 Docker 容器端口。',
++      command: 'server { listen 80; location / { proxy_pass http://127.0.0.1:3000; } }',
++      estimatedMinutes: 10,
++    },
++  ],
++
++  'fly-io': [
++    {
++      title: '安装 flyctl',
++      description: '在本地安装 Fly.io 官方命令行工具。',
++      command: 'curl -L https://fly.io/install.sh | sh',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '登录 Fly.io',
++      description: '执行 flyctl auth signup 或 flyctl auth login 完成认证。',
++      command: 'flyctl auth login',
++      estimatedMinutes: 3,
++    },
++    {
++      title: '初始化应用',
++      description: '在项目根目录执行 flyctl launch，按提示选择区域和配置。',
++      command: 'flyctl launch',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '部署应用',
++      description: '执行 flyctl deploy 将应用构建并部署到 Fly.io 全球边缘。',
++      command: 'flyctl deploy',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '查看应用状态',
++      description: '通过 flyctl status 查看实例状态，通过 flyctl open 打开应用。',
++      command: 'flyctl status',
++      estimatedMinutes: 2,
++    },
++  ],
++
++  'self-hosted-k8s': [
++    {
++      title: '准备服务器集群',
++      description: '准备至少 3 台服务器（1 Master + 2 Worker），安装兼容的 Linux 系统。',
++      estimatedMinutes: 30,
++    },
++    {
++      title: '安装容器运行时',
++      description: '在所有节点安装 containerd 或 Docker 作为容器运行时。',
++      command: 'sudo apt update && sudo apt install -y containerd',
++      estimatedMinutes: 10,
++    },
++    {
++      title: '初始化 Kubernetes 集群',
++      description: '在 Master 节点使用 kubeadm 初始化集群。',
++      command: 'sudo kubeadm init --pod-network-cidr=10.244.0.0/16',
++      estimatedMinutes: 15,
++    },
++    {
++      title: '创建 .kube 目录',
++      description: '在当前用户目录下创建 .kube 文件夹，用于存放 kubectl 配置文件。',
++      command: 'mkdir -p $HOME/.kube',
++      estimatedMinutes: 1,
++    },
++    {
++      title: '复制集群证书',
++      description: '将 kubeadm 生成的 admin 配置文件复制到当前用户目录。',
++      command: 'sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config',
++      estimatedMinutes: 1,
++    },
++    {
++      title: '修改文件权限',
++      description: '将 kubectl 配置文件的所有者改为当前用户，避免权限问题。',
++      command: 'sudo chown $(id -u):$(id -g) $HOME/.kube/config',
++      estimatedMinutes: 1,
++    },
++    {
++      title: '安装网络插件',
++      description: '部署 Flannel 网络插件，使 Pod 间可以通信。建议从 Flannel 官方 release 页面获取最新稳定版本 YAML。',
++      command: 'kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml',
++      estimatedMinutes: 5,
++    },
++    {
++      title: '部署应用',
++      description: '编写 Deployment 和 Service YAML 并应用到集群。',
++      command: 'kubectl apply -f k8s/',
++      estimatedMinutes: 10,
++    },
++  ],
++}
+diff --git a/frontend/src/data/__tests__/deployment-plan-steps.spec.ts b/frontend/src/data/__tests__/deployment-plan-steps.spec.ts
+new file mode 100644
+index 0000000..90acbc8
+--- /dev/null
++++ b/frontend/src/data/__tests__/deployment-plan-steps.spec.ts
+@@ -0,0 +1,81 @@
++import { describe, it, expect } from 'vitest'
++import { deploymentPlans } from '@/data/deployment-plans'
++import { deploymentPlanSteps } from '@/data/deployment-plan-steps'
++
++describe('deploymentPlanSteps 完整性', () => {
++  const planIds = Object.keys(deploymentPlans)
++
++  it('每个 deploymentPlans 中的 planId 在 deploymentPlanSteps 中都有对应条目', () => {
++    for (const planId of planIds) {
++      expect(deploymentPlanSteps[planId]).toBeDefined()
++    }
++  })
++
++  it('deploymentPlanSteps 中没有 deploymentPlans 不存在的 planId', () => {
++    for (const planId of Object.keys(deploymentPlanSteps)) {
++      expect(deploymentPlans[planId]).toBeDefined()
++    }
++  })
++
++  it('每个 planId 对应的步骤数组长度 ∈ [3, 8]', () => {
++    for (const planId of planIds) {
++      const steps = deploymentPlanSteps[planId]
++      expect(steps.length).toBeGreaterThanOrEqual(3)
++      expect(steps.length).toBeLessThanOrEqual(8)
++    }
++  })
++
++  it('每个步骤的 title 和 description 非空且不只包含空白', () => {
++    for (const planId of planIds) {
++      for (const step of deploymentPlanSteps[planId]) {
++        expect(step.title.trim().length).toBeGreaterThan(0)
++        expect(step.description.trim().length).toBeGreaterThan(0)
++      }
++    }
++  })
++
++  it('每个步骤的 title ≤ 30 字符', () => {
++    for (const planId of planIds) {
++      for (const step of deploymentPlanSteps[planId]) {
++        expect(step.title.length).toBeLessThanOrEqual(30)
++      }
++    }
++  })
++
++  it('每个步骤的 description ≤ 200 字符', () => {
++    for (const planId of planIds) {
++      for (const step of deploymentPlanSteps[planId]) {
++        expect(step.description.length).toBeLessThanOrEqual(200)
++      }
++    }
++  })
++
++  it('estimatedMinutes（若存在）为大于 0 的整数', () => {
++    for (const planId of planIds) {
++      for (const step of deploymentPlanSteps[planId]) {
++        if (step.estimatedMinutes !== undefined) {
++          expect(Number.isInteger(step.estimatedMinutes)).toBe(true)
++          expect(step.estimatedMinutes).toBeGreaterThan(0)
++        }
++      }
++    }
++  })
++
++  it('command（若存在）非空且不只包含空白', () => {
++    for (const planId of planIds) {
++      for (const step of deploymentPlanSteps[planId]) {
++        if (step.command !== undefined) {
++          expect(step.command.trim().length).toBeGreaterThan(0)
++        }
++      }
++    }
++  })
++
++  it('总步骤数 ≥ 12', () => {
++    const totalSteps = planIds.reduce(
++      (sum, planId) => sum + deploymentPlanSteps[planId].length,
++      0,
++    )
++    expect(totalSteps).toBeGreaterThanOrEqual(12)
++  })
++})

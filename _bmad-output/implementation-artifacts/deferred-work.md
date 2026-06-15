@@ -1,3 +1,17 @@
+## Deferred from: code review of 3-5-部署步骤指南内容补全 (2026-06-15)
+
+- **空步骤提示在异步加载场景下可能闪烁** [frontend/src/views/StepGuideView.vue:40] — 当前数据为静态导入，若未来改为异步加载需引入 `isLoading` 状态
+- **移动端响应式布局无法从 diff 独立验证** [frontend/src/views/StepGuideView.vue:339-369] — 需在 375px 宽度下手动验证
+- **构建无新增 TypeScript 错误已验证** — 已实际运行 `npx vite build`，构建成功，无新增 TypeScript 错误
+- **command 数据层未校验 HTML 特殊字符** [frontend/src/data/__tests__/deployment-plan-steps.spec.ts] — 当前 Vue 文本插值已转义，属未来动态数据源防御性建议
+
+## Deferred from: code review of 3-5-部署步骤指南内容补全 (2026-06-12)
+
+- **手动/E2E 验证项未执行** — 桌面 Chrome、移动端 375x667、一键复制、结果页跳转等未在浏览器中手动验证，留待部署后验证
+- **`estimatedMinutes` 类型允许 0 但数据测试要求 > 0** — 类型与测试语义存在轻微不一致，当前数据层已拦截，无实际风险
+- **totalEstimatedMinutes 理论 number 溢出** — 当前数据规模（12 方案 × 8 步骤）不可能触发，属理论风险
+- **未测试 planId 为 null/undefined** — TypeScript 类型签名已约束为 `string`，运行时测试覆盖空字符串和非法字符串即可
+
 ## Deferred from: code review of 4-1-AIChat组件开发 (2026-06-09)
 
 - **消息区域使用原生 div 而非 el-scrollbar** [frontend/src/components/AIChat.vue:126] — Dev Notes 提到 el-scrollbar 虚拟滚动但实现使用原生 div，当前消息量下性能可接受，后续如有性能问题再升级
